@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ninja Movie Vault</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <nav>
+      <h1>Ninja <span>Movies</span></h1>
+      <div class="controls">
+        <input type="text" id="search" placeholder="Search movies...">
+        <select id="genre">
+          <option value="">All Genres</option>
+          <option value="action">Action</option>
+          <option value="comedy">Comedy</option>
+          <option value="drama">Drama</option>
+          <option value="horror">Horror</option>
+          <option value="thriller">Thriller</option>
+          <option value="sci-fi">Sci-Fi</option>
+          <option value="animation">Animation</option>
+        </select>
+        <input type="number" id="year" placeholder="Year (e.g. 2020)" min="1900" max="2025">
+      </div>
+    </nav>
+  </header>
+
+  <main id="movie-grid"></main>
+
+  <div id="modal">
+    <div class="modal-box">
+      <button id="close-modal">&times;</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
