@@ -221,12 +221,38 @@ async function renderMovieDetailPage(id) {
               </div>
           </section>
 
-          <div class="detail-container">
+          <div class="detail-container max-w-[1600px] mx-auto px-4 md:px-12 w-full">
               <div class="detail-main">
-                  <div class="info-side">
-                      <p><span>Genres:</span> ${movie.genres.join(', ')}</p>
-                      ${movie.cast ? `<p><span>Cast:</span> ${movie.cast.map(c => c.name).slice(0, 5).join(', ')}</p>` : ''}
-                      <p><span>Language:</span> ${movie.language.toUpperCase()}</p>
+                  <div class="info-side w-full mb-8">
+                      <!-- Modern Genres UI -->
+                      <div class="flex flex-wrap gap-2 mb-6">
+                          ${movie.genres.map(g => `<span class="px-4 py-1.5 bg-white/10 text-white/90 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border border-white/10 shadow-lg">${g}</span>`).join('')}
+                      </div>
+                      
+                      <!-- Modern Cast UI -->
+                      ${movie.cast ? `
+                      <div class="mb-6">
+                          <h4 class="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Top Cast</h4>
+                          <div class="flex flex-wrap gap-3">
+                              ${movie.cast.slice(0, 5).map(c => `
+                                  <div class="flex items-center gap-3 bg-white/5 pr-4 rounded-full hover:bg-white/10 transition-all duration-300 border border-white/5 cursor-pointer hover:border-white/20 hover:-translate-y-1">
+                                      ${c.url_small_image 
+                                          ? `<img src="${c.url_small_image}" class="w-10 h-10 rounded-full object-cover border-2 border-transparent shadow-md">` 
+                                          : `<div class="w-10 h-10 rounded-full bg-netflix-red/20 flex items-center justify-center text-netflix-red text-sm border-2 border-transparent shadow-md"><i class="fa fa-user"></i></div>`}
+                                      <div class="flex flex-col py-1">
+                                          <span class="text-[13px] font-bold text-white/90 leading-tight">${c.name}</span>
+                                          ${c.character_name ? `<span class="text-[10px] font-medium text-white/50 leading-tight">${c.character_name}</span>` : ''}
+                                      </div>
+                                  </div>
+                              `).join('')}
+                          </div>
+                      </div>` : ''}
+                      
+                      <!-- Modern Language UI -->
+                      <div class="mb-2">
+                          <h4 class="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Language</h4>
+                          <span class="px-2.5 py-1 bg-netflix-red/20 text-netflix-red rounded text-[10px] font-black uppercase tracking-widest border border-netflix-red/30">${movie.language}</span>
+                      </div>
                   </div>
                   
                   <div style="margin-top: 2rem;">
@@ -559,14 +585,22 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
                 videoPlayer.src = `${BACKEND_URL}/api/video/${torrentId}`;
                 videoPlayer.load();
                 videoPlayer.onloadedmetadata = () => {
-                    if (startTime > 0) videoPlayer.currentTime = startTime;
-                    videoPlayer.play();
+                    // Only resume if we aren't at the very end of the movie (>95%)
+                    if (startTime > 0 && startTime < videoPlayer.duration * 0.95) {
+                        videoPlayer.currentTime = startTime;
+                    }
+                    videoPlayer.play().catch(e => console.warn('Autoplay prevented:', e));
                 };
                 
                 setInterval(() => {
                     if (!videoPlayer.paused) {
                         const currentTime = videoPlayer.currentTime;
-                        localStorage.setItem(`watch_progress_${movie.id}`, currentTime);
+                        // Avoid saving progress if we're at the very end
+                        if (currentTime < videoPlayer.duration * 0.95) {
+                            localStorage.setItem(`watch_progress_${movie.id}`, currentTime);
+                        } else {
+                            localStorage.removeItem(`watch_progress_${movie.id}`);
+                        }
                         fetch(`${BACKEND_URL}/api/watch-progress/${movie.id}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
