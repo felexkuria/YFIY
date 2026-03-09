@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Recommended For You - Ninja Movie Vault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            netflix: {
+              red: '#e50914',
+              dark: '#141414',
+              gray: '#181818',
+              lightGray: '#222222'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      body {
+        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    }
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="pb-20 md:pb-0">
+  <!-- Top Navigation -->
+  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95 backdrop-blur-md border-b border-white/10 transition-all duration-500" id="main-header">
+    <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
+      <div class="logo shrink-0 flex items-center gap-8">
+        <a href="index.html" class="no-underline">
+          <h1 class="text-3xl md:text-4xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+        </a>
+        <div class="hidden md:flex items-center gap-6 ml-4">
+          <a href="index.html" class="nav-link text-gray-300">Home</a>
+          <a href="watchlist.html" class="nav-link text-gray-300">My List</a>
+          <span class="nav-link text-white border-b-2 border-netflix-red pb-1">Recommendations</span>
+          <a href="downloads.html" class="nav-link text-gray-300">Downloads</a>
+          <a href="watched.html" class="nav-link text-gray-300">Watched</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 md:gap-6">
+        <div class="flex md:hidden items-center gap-4">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        <div class="w-8 h-8 rounded bg-blue-500 flex items-center justify-center font-bold text-xs text-white shrink-0">F</div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero Billboard for Top Recommendation -->
+  <div id="hero-placeholder"></div>
+
+  <main id="movie-grid" class="relative z-20 min-h-screen px-4 md:px-[4%] max-w-[1600px] mx-auto mt-[-100px] md:mt-[-150px]">
+      <!-- Loader -->
+      <div id="loader" class="flex flex-col items-center justify-center h-[60vh] space-y-4">
+          <div class="w-10 h-10 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
+          <p class="text-gray-400 font-medium animate-pulse text-sm">Finding your next favorite movie...</p>
+      </div>
+      
+      <div id="content" class="hidden">
+          <h2 id="grid-title" class="text-xl md:text-3xl font-bold mb-6 text-white tracking-tight pt-12 md:pt-20">Recommendations for You</h2>
+          <div id="movies-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6">
+              <!-- Movies will be injected here -->
+          </div>
+      </div>
+  </main>
+
+  <!-- Bottom Navigation (Mobile) -->
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-md border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+      <a href="index.html" class="flex flex-col items-center gap-1 text-gray-400">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span class="text-[10px]">Home</span>
+      </a>
+      <a href="recommendations.html" class="flex flex-col items-center gap-1 text-white">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span class="text-[10px]">Top Picks</span>
+      </a>
+      <a href="watchlist.html" class="flex flex-col items-center gap-1 text-gray-400">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span class="text-[10px]">My List</span>
+      </a>
+  </div>
+
+  <div id="modal" class="fixed inset-0 bg-black z-[5000] hidden flex items-center justify-center">
+      <div id="modal-content" class="w-full h-full relative"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    window.addEventListener('load', async () => {
+        const movieGrid = document.getElementById('movie-grid');
+        const container = document.getElementById('movies-container');
+        const contentDiv = document.getElementById('content');
+        const loader = document.getElementById('loader');
+        const heroPlaceholder = document.getElementById('hero-placeholder');
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/recommendations`);
+            const movies = await res.json();
+
+            if (!movies || movies.length === 0) {
+                loader.classList.add('hidden');
+                movieGrid.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-[70vh] space-y-6 text-center px-4 pt-24">
+                        <div class="text-7xl">🎯</div>
+                        <div class="space-y-2">
+                            <h2 class="text-2xl font-bold text-white uppercase tracking-tight">No recommendations</h2>
+                            <p class="text-gray-400 text-sm">Add movies to My List to unlock your personalized vault.</p>
+                        </div>
+                        <a href="index.html" class="px-8 py-3 bg-white text-black font-bold rounded-sm text-sm uppercase tracking-wider">
+                            Explore
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Top movie for Hero Billboard
+            const topMovie = movies[0];
+            const heroBg = topMovie.yt_trailer_code 
+                ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/maxresdefault.jpg`
+                : (topMovie.background_image || topMovie.medium_cover_image);
+
+            heroPlaceholder.innerHTML = `
+              <section class="relative h-[75vh] md:h-[85vh] w-full overflow-hidden bg-black">
+                  <div id="hero-trailer-bg" class="absolute inset-0 z-0 opacity-0 transition-opacity duration-1000">
+                      ${topMovie.yt_trailer_code ? `
+                      <iframe 
+                          id="hero-iframe"
+                          class="w-full h-full scale-[1.3]" 
+                          src="https://www.youtube-nocookie.com/embed/${topMovie.yt_trailer_code}?autoplay=0&controls=0&mute=1&loop=1&playlist=${topMovie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3" 
+                          frameborder="0" 
+                          allow="autoplay; encrypted-media">
+                      </iframe>
+                      ` : ''}
+                  </div>
+                  <div id="hero-img-bg" class="absolute inset-0 bg-cover bg-top scale-105" style="background-image: url('${heroBg}')"></div>
+                  <div class="absolute inset-0 bg-gradient-to-r from-black via-black/20 to-transparent z-10"></div>
+                  <div class="absolute inset-0 bg-gradient-to-t from-netflix-dark via-transparent to-transparent z-10"></div>
+                  
+                  <div class="absolute bottom-[25%] left-[4%] z-20 max-w-xl space-y-4 md:space-y-6">
+                      <h2 class="text-4xl md:text-7xl font-black tracking-tighter uppercase drop-shadow-2xl text-white line-clamp-2">${topMovie.title}</h2>
+                      <div class="flex items-center gap-4 text-sm md:text-lg font-bold">
+                          <span class="text-[#46d369]">${topMovie.rating * 10}% Match</span>
+                          <span class="text-gray-300">${topMovie.year}</span>
+                          <span class="px-2 py-0.5 border border-gray-500 text-xs">HD</span>
+                      </div>
+                      <p class="text-sm md:text-lg font-medium line-clamp-3 text-gray-200 drop-shadow-lg">${topMovie.description || ''}</p>
+                      <div class="flex gap-4 pt-2">
+                          <button onclick="window.location.href='movie.html?id=${topMovie.id}'" class="flex items-center gap-3 px-8 py-3 bg-white text-black rounded font-bold text-lg md:text-xl hover:bg-white/80 transition-all transform active:scale-95 shadow-xl">
+                              <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M6 4l15 8-15 8V4z"/></svg> Play
+                          </button>
+                          ${topMovie.yt_trailer_code ? `
+                          <button id="hero-play-trailer" class="flex items-center gap-3 px-8 py-3 bg-gray-500/70 text-white rounded font-bold text-lg md:text-xl hover:bg-gray-500/50 transition-all backdrop-blur-md">
+                              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Trailer
+                          </button>
+                          ` : ''}
+                      </div>
+                  </div>
+              </section>
+            `;
+
+            if (topMovie.yt_trailer_code) {
+                const playBtn = document.getElementById('hero-play-trailer');
+                const imgBg = document.getElementById('hero-img-bg');
+                const trailerBg = document.getElementById('hero-trailer-bg');
+                const iframe = document.getElementById('hero-iframe');
+
+                playBtn.onclick = () => {
+                    imgBg.classList.add('opacity-0');
+                    trailerBg.classList.remove('opacity-0');
+                    trailerBg.classList.add('opacity-100');
+                    iframe.src += "&autoplay=1&mute=0";
+                    playBtn.style.display = 'none';
+                };
+            }
+
+            loader.classList.add('hidden');
+            contentDiv.classList.remove('hidden');
+            
+            // Render the rest of the movies in the grid
+            container.innerHTML = movies.slice(1).map(m => `
+                <div class="group cursor-pointer transition-transform duration-300 active:scale-95" onclick="window.location.href='movie.html?id=${m.id}'">
+                    <div class="relative aspect-[2/3] rounded overflow-hidden shadow-lg bg-netflix-gray">
+                        <img src="${m.medium_cover_image}" class="w-full h-full object-cover" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-end">
+                            <h4 class="font-bold text-[10px] md:text-sm truncate text-white">${m.title}</h4>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-[#46d369] text-[8px] md:text-xs font-black">${m.rating * 10}% Match</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (err) {
+            console.error(err);
+            loader.classList.add('hidden');
+            movieGrid.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-[70vh] space-y-6 text-center px-4 pt-24">
+                    <div class="text-red-600 text-5xl">⚠️</div>
+                    <h2 class="text-xl font-bold text-white">Something went wrong</h2>
+                    <p class="text-gray-400 text-sm">We're having trouble connecting to your vault.</p>
+                    <button onclick="location.reload()" class="px-6 py-2 bg-white/10 hover:bg-white/20 rounded font-bold transition-all text-white text-sm">Try Again</button>
+                </div>
+            `;
+        }
+    });
+
+  </script>
+</body>
+</html>

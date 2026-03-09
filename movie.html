@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Movie Details - Ninja Movie Vault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome for Person Icon -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            netflix: {
+              red: '#e50914',
+              dark: '#141414',
+              gray: '#181818'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      body {
+        @apply bg-netflix-dark text-white antialiased overflow-x-hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+    }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="pb-20 md:pb-0">
+  <header class="fixed top-0 w-full z-[1000] transition-all duration-500 bg-transparent" id="main-header">
+    <nav class="flex justify-between items-center px-4 md:px-12 py-4 max-w-[1600px] mx-auto gap-4">
+      <div class="logo shrink-0">
+        <a href="index.html" class="no-underline">
+          <h1 class="text-2xl md:text-3xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+        </a>
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="index.html" class="font-semibold text-sm hover:text-gray-300 transition-colors">← Browse</a>
+        <a href="watchlist.html" class="hidden md:block font-semibold text-sm hover:text-gray-300 transition-colors whitespace-nowrap">💖 My List</a>
+        <div class="w-8 h-8 rounded bg-blue-500 md:flex items-center justify-center font-bold text-xs shrink-0 text-white hidden">F</div>
+      </div>
+    </nav>
+  </header>
+
+  <main id="movie-detail-view" class="pt-0 min-h-screen">
+    <div class="flex flex-col items-center justify-center h-screen space-y-4 text-white">
+        <div class="w-16 h-16 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
+        <p class="text-gray-400 font-medium animate-pulse text-lg">Loading details...</p>
+    </div>
+  </main>
+
+  <!-- Bottom Navigation (Mobile Only) -->
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+      <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span class="text-[10px] font-bold">Home</span>
+      </a>
+      <a href="recommendations.html" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span class="text-[10px] font-bold">Top Picks</span>
+      </a>
+      <a href="watchlist.html" class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span class="text-[10px] font-bold">My List</span>
+      </a>
+  </div>
+
+  <!-- Player Modal (Centered, High Z-Index) -->
+  <div id="modal" class="fixed inset-0 bg-black z-[9999] hidden flex-col items-center justify-center overflow-hidden">
+      <div id="modal-content" class="w-full h-full relative"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    window.addEventListener('load', () => {
+        const params = new URLSearchParams(window.location.search);
+        const movieId = params.get('id');
+        if (movieId) {
+            renderMovieDetailPage(movieId);
+        } else {
+            window.location.href = 'index.html';
+        }
+    });
+
+    window.addEventListener('scroll', () => {
+      const header = document.getElementById('main-header');
+      if (header) {
+        if (window.scrollY > 50) {
+          header.classList.add('bg-netflix-dark', 'shadow-2xl');
+          header.classList.remove('bg-transparent');
+        } else {
+          header.classList.remove('bg-netflix-dark', 'shadow-2xl');
+          header.classList.add('bg-transparent');
+        }
+      }
+    });
+  </script>
+</body>
+</html>

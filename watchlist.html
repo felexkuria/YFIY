@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>My Watchlist - Ninja Movie Vault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            netflix: {
+              red: '#e50914',
+              dark: '#141414',
+              gray: '#181818'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      body {
+        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
+        -webkit-tap-highlight-color: transparent;
+      }
+    }
+  </style>
+</head>
+<body class="pb-20 md:pb-0">
+  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95 backdrop-blur-md border-b border-white/10" id="main-header">
+    <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
+      <div class="logo shrink-0 flex items-center gap-8">
+        <a href="index.html" class="no-underline">
+          <h1 class="text-3xl md:text-4xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+        </a>
+        <div class="hidden md:flex items-center gap-6 ml-4">
+          <a href="index.html" class="nav-link text-gray-300">Home</a>
+          <span class="nav-link text-white border-b-2 border-netflix-red pb-1">My List</span>
+          <a href="recommendations.html" class="nav-link text-gray-300">Recommendations</a>
+          <a href="downloads.html" class="nav-link text-gray-300">Downloads</a>
+          <a href="watched.html" class="nav-link text-gray-300">Watched</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 md:gap-6">
+        <div class="flex md:hidden items-center gap-4">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        </div>
+        <div class="w-8 h-8 rounded bg-blue-500 flex items-center justify-center font-bold text-xs text-white shrink-0">F</div>
+      </div>
+    </nav>
+
+  </header>
+
+  <main id="movie-grid" class="pt-32 md:pt-28 pb-20 min-h-screen px-4 md:px-[4%] max-w-[1600px] mx-auto">
+      <div id="loader" class="flex flex-col items-center justify-center h-[60vh] space-y-4">
+          <div class="w-10 h-10 md:w-12 md:h-12 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
+          <p class="text-gray-400 font-medium animate-pulse text-sm md:text-base text-center">Loading your curated collection...</p>
+      </div>
+      <div id="content" class="hidden">
+          <h2 class="text-2xl md:text-3xl font-black tracking-tighter mb-6 md:mb-10 border-b border-white/10 pb-4 text-white">My List</h2>
+          <div id="movies-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6">
+          </div>
+      </div>
+  </main>
+
+  <!-- Bottom Navigation (Mobile) -->
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+      <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span class="text-[10px] font-bold">Home</span>
+      </a>
+      <a href="recommendations.html" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span class="text-[10px] font-bold">Top Picks</span>
+      </a>
+      <a href="watchlist.html" class="flex flex-col items-center gap-1 text-white">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          <span class="text-[10px] font-bold">My List</span>
+      </a>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    window.addEventListener('load', async () => {
+        const movieGrid = document.getElementById('movie-grid');
+        const container = document.getElementById('movies-container');
+        const contentDiv = document.getElementById('content');
+        const loader = document.getElementById('loader');
+        const countSpan = document.getElementById('watchlist-count');
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/watchlist`);
+            const movies = await res.json();
+            const watchlist = Array.isArray(movies) ? movies : movies.watchlist || [];
+
+            if (watchlist.length === 0) {
+                movieGrid.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-[60vh] space-y-6 md:space-y-8 text-center px-4">
+                        <div class="text-6xl md:text-8xl">🍿</div>
+                        <div class="space-y-2">
+                            <h2 class="text-2xl md:text-3xl font-black tracking-tighter text-white">Your list is empty</h2>
+                            <p class="text-gray-400 text-base md:text-lg">Movies you add to your list will appear here.</p>
+                        </div>
+                        <a href="index.html" class="px-6 py-2 md:px-8 md:py-3 bg-white text-black font-bold rounded hover:bg-gray-200 transition-all transform hover:scale-105 text-sm md:text-base">
+                            Find something to watch
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            loader.classList.add('hidden');
+            contentDiv.classList.remove('hidden');
+            
+            container.innerHTML = watchlist.map(m => `
+                <div class="group cursor-pointer transition-transform duration-300 active:scale-95" onclick="window.location.href='movie.html?id=${m.id}'">
+                    <div class="relative aspect-[2/3] rounded overflow-hidden shadow-2xl bg-netflix-gray">
+                        <img src="${m.medium_cover_image}" class="w-full h-full object-cover" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-3 md:p-4 flex flex-col justify-end">
+                            <h4 class="font-black text-xs md:text-sm truncate text-white">${m.title}</h4>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-[#46d369] text-[10px] md:text-xs font-black">${m.rating * 10}% Match</span>
+                                <span class="text-gray-400 text-[10px] md:text-xs">${m.year}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            if (countSpan) countSpan.textContent = `My List (${watchlist.length})`;
+
+        } catch (err) {
+            console.error(err);
+            movieGrid.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-[60vh] space-y-6 text-center px-4">
+                    <div class="text-red-600 text-5xl md:text-6xl text-white">⚠️</div>
+                    <h2 class="text-xl md:text-2xl font-bold text-white">Failed to load watchlist</h2>
+                    <p class="text-gray-400 text-sm md:text-base">Make sure the streaming server is running.</p>
+                    <button onclick="location.reload()" class="px-6 py-2 bg-white/10 hover:bg-white/20 rounded font-bold transition-all text-white text-sm md:text-base">Retry</button>
+                </div>
+            `;
+        }
+    });
+  </script>
+</body>
+</html>

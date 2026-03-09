@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>My Downloads - Ninja Movie Vault</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            netflix: {
+              red: '#e50914',
+              dark: '#141414',
+              gray: '#181818'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer base {
+      body {
+        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
+      }
+    }
+  </style>
+</head>
+<body class="pb-20 md:pb-0">
+  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95 backdrop-blur-md border-b border-white/10" id="main-header">
+    <nav class="flex flex-col md:flex-row justify-between items-center px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto gap-3 md:gap-4">
+      <div class="logo shrink-0 flex items-center justify-between w-full md:w-auto">
+        <a href="index.html" class="no-underline">
+          <h1 class="text-xl md:text-3xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+        </a>
+        <div class="flex md:hidden items-center gap-4">
+            <a href="index.html" class="text-white">🏠</a>
+            <a href="recommendations.html" class="text-gray-300">🎯</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 md:gap-6">
+        <div class="hidden md:flex items-center gap-6 mr-4">
+            <a href="index.html" class="font-semibold text-sm hover:text-gray-300 transition-colors">Home</a>
+            <a href="watchlist.html" class="font-semibold text-sm hover:text-gray-300 transition-colors">My List</a>
+            <span class="font-bold text-sm text-white border-b-2 border-netflix-red pb-1">Downloads</span>
+            <a href="watched.html" class="font-semibold text-sm hover:text-gray-300 transition-colors">Watched</a>
+        </div>
+        <span class="text-base md:text-lg font-bold text-gray-400 whitespace-nowrap">Local Vault</span>
+      </div>
+    </nav>
+  </header>
+
+  <main id="movie-grid" class="pt-32 md:pt-28 pb-20 min-h-screen px-4 md:px-[4%] max-w-[1600px] mx-auto">
+      <div id="loader" class="flex flex-col items-center justify-center h-[60vh] space-y-4 text-center">
+          <div class="w-10 h-10 md:w-12 md:h-12 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
+          <p class="text-gray-400 font-medium animate-pulse text-sm">Scanning local downloads...</p>
+      </div>
+      <div id="content" class="hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-8 border-b border-white/10 pb-4 gap-3">
+            <div>
+              <h2 class="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase italic">Downloaded Offline</h2>
+              <p id="stats-line" class="text-gray-500 text-sm mt-1">Loading stats…</p>
+            </div>
+            <button id="sync-btn"
+              class="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-bold rounded-lg transition-all active:scale-95 shrink-0"
+              onclick="syncPosters()">
+              <svg id="sync-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span id="sync-label">Sync Posters</span>
+            </button>
+          </div>
+          <div id="movies-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-5">
+          </div>
+      </div>
+
+  </main>
+
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+      <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span class="text-[10px] font-bold">Home</span>
+      </a>
+      <a href="recommendations.html" class="flex flex-col items-center gap-1 text-gray-500 transition-colors">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span class="text-[10px] font-bold">Top Picks</span>
+      </a>
+      <a href="downloads.html" class="flex flex-col items-center gap-1 text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span class="text-[10px] font-bold">Downloads</span>
+      </a>
+  </div>
+
+  <div id="modal" class="fixed inset-0 bg-black z-[5000] hidden flex items-center justify-center">
+      <div id="modal-content" class="w-full h-full relative"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    window.addEventListener('load', async () => {
+        const movieGrid = document.getElementById('movie-grid');
+        const container = document.getElementById('movies-container');
+        const contentDiv = document.getElementById('content');
+        const loader = document.getElementById('loader');
+        const API_BASE = 'https://movies-api.accel.li/api/v2';
+
+        const statsLine = document.getElementById('stats-line');
+
+        window.syncPosters = async function() {
+            const btn = document.getElementById('sync-btn');
+            const icon = document.getElementById('sync-icon');
+            const label = document.getElementById('sync-label');
+            btn.disabled = true;
+            icon.classList.add('animate-spin');
+            label.textContent = 'Syncing…';
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/sync-downloads`, { method: 'POST' });
+                const data = await res.json();
+                label.textContent = `✓ ${data.synced_count} synced`;
+                icon.classList.remove('animate-spin');
+                if (data.synced_count > 0) {
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    setTimeout(() => { label.textContent = 'Sync Posters'; btn.disabled = false; }, 3000);
+                }
+            } catch(e) {
+                label.textContent = 'Failed'; btn.disabled = false; icon.classList.remove('animate-spin');
+            }
+        };
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/downloads`);
+            const downloads = await res.json();
+
+            if (downloads.length === 0) {
+                movieGrid.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-[60vh] space-y-6 md:space-y-8 text-center px-4">
+                        <div class="text-6xl md:text-8xl">📥</div>
+                        <div class="space-y-2">
+                            <h2 class="text-2xl md:text-3xl font-black tracking-tighter text-white uppercase">Local Vault is Empty</h2>
+                            <p class="text-gray-400 text-base md:text-lg">Movies you finish downloading will appear here for offline viewing.</p>
+                        </div>
+                        <a href="index.html" class="px-6 py-2 md:px-8 md:py-3 bg-white text-black font-bold rounded hover:bg-gray-200 transition-all transform hover:scale-105">
+                            Browse and Download
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+            const moviesWithMetadata = downloads.map(d => ({
+                    id: d.movie_id,
+                    title: d.title,
+                    year: d.year || '',
+                    rating: d.rating || 0,
+                    medium_cover_image: d.medium_cover_image || '',
+                    localPath: d.path,
+                    size_mb: d.size_mb
+                }));
+
+            // Populate stats
+            const totalMb = downloads.reduce((sum, d) => sum + (d.size_mb || 0), 0);
+            const totalGb = (totalMb / 1024).toFixed(1);
+            if (statsLine) {
+                statsLine.textContent = `${downloads.length} movies • ${totalGb} GB total`;
+            }
+
+            const validMovies = moviesWithMetadata;
+
+            if (validMovies.length === 0) {
+                movieGrid.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-[60vh] space-y-6 text-center px-4">
+                        <div class="text-6xl">🎬</div>
+                        <h2 class="text-2xl font-black text-white">Files found but no metadata</h2>
+                        <p class="text-gray-400">Rename your files to match movie titles for better detection</p>
+                    </div>
+                `;
+                return;
+            }
+
+            loader.classList.add('hidden');
+            contentDiv.classList.remove('hidden');
+
+            const PLACEHOLDER = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450"><rect fill="#1a1a1a" width="300" height="450"/><text fill="#555" font-family="Arial" font-size="14" text-anchor="middle" x="150" y="220">🎬</text><text fill="#555" font-family="Arial" font-size="11" text-anchor="middle" x="150" y="245">No Poster</text></svg>`);
+
+            container.innerHTML = validMovies.map(m => {
+                const img = m.medium_cover_image || PLACEHOLDER;
+                const clickAction = m.id
+                    ? `window.location.href='movie.html?id=${m.id}'`
+                    : `playLocalMovie('${m.localPath}', '${(m.title||'').replace(/'/g, "\\'")}')`;
+                return `
+                <div class="group cursor-pointer transition-transform duration-300 hover:scale-105 active:scale-95" onclick="${clickAction}">
+                    <div class="relative aspect-[2/3] rounded overflow-hidden shadow-2xl bg-netflix-gray">
+                        <img src="${img}" class="w-full h-full object-cover" loading="lazy" alt="${m.title}"
+                             onerror="this.src='${PLACEHOLDER}'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-3 md:p-4 flex flex-col justify-end">
+                            <h4 class="font-black text-xs md:text-sm truncate text-white">${m.title}</h4>
+                            <div class="flex justify-between items-center mt-1">
+                                <span class="text-[#46d369] text-[10px] md:text-xs font-black">${m.size_mb} MB</span>
+                                <span class="text-gray-400 text-[10px] md:text-xs">${m.year}</span>
+                            </div>
+                        </div>
+                        <div class="absolute top-2 right-2 bg-netflix-red text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg">OFFLINE</div>
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center">
+                                <svg class="w-6 h-6 fill-white ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch (err) {
+            console.error(err);
+            loader.classList.add('hidden');
+            movieGrid.innerHTML = `<div class="flex flex-col items-center justify-center h-[60vh] text-white space-y-4"><h2 class="text-2xl font-bold">Error loading downloads</h2><p class="text-gray-400">${err.message}</p></div>`;
+        }
+    });
+
+    function playLocalMovie(path, title) {
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+        
+        modalContent.innerHTML = `
+            <div class="bg-black h-screen w-screen relative">
+                <button id="close-player" class="absolute top-6 left-6 md:top-10 md:left-10 text-white text-4xl md:text-5xl font-light hover:text-gray-400 transition-colors z-[6000] drop-shadow-lg">←</button>
+                <div class="absolute top-8 right-6 md:top-12 md:right-12 bg-white/20 text-white px-3 py-1 md:px-4 md:py-1.5 rounded font-black text-sm md:text-lg z-[6000] border border-white/30 backdrop-blur-md uppercase tracking-tighter">OFFLINE</div>
+                <video id="video-player" class="w-full h-full object-contain" controls autoplay webkit-playsinline playsinline x-webkit-airplay="allow" crossorigin="anonymous"></video>
+            </div>
+        `;
+
+        const videoPlayer = document.getElementById('video-player');
+        videoPlayer.src = `${BACKEND_URL}/api/play-local/${encodeURIComponent(path)}`;
+        videoPlayer.load();
+        videoPlayer.play().catch(e => console.log('Play interrupted:', e));
+
+        document.getElementById('close-player').onclick = () => {
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+            modalContent.innerHTML = '';
+        };
+    }
+  </script>
+</body>
+</html>
