@@ -466,8 +466,21 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ magnet: magnetLink })
-  }).then(res => res.json()).then(data => {
+  }).then(res => res.json()).then(async data => {
     const torrentId = data.torrent_id;
+    
+    // --- FETCH LAN IP For AirPlay --- //
+    // If the user accesses the UI via localhost, AirPlay will fail because the TV tries to load localhost from itself.
+    let airplayBackendUrl = BACKEND_URL;
+    try {
+        if (BACKEND_URL.includes('localhost') || BACKEND_URL.includes('127.0.0.1')) {
+            const siRes = await fetch(`${BACKEND_URL}/api/system-info`);
+            const si = await siRes.json();
+            if (si && si.lan_ip) {
+                airplayBackendUrl = `http://${si.lan_ip}:${si.port || 5001}`;
+            }
+        }
+    } catch(e) { console.warn("Could not fetch LAN IP", e); }
     
     fetch(`${BACKEND_URL}/api/check-download/${torrentId}`).then(r => r.json()).then(st => {
         if (st.resolution) resBadge.textContent = st.resolution;
@@ -506,7 +519,7 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
     // HTML <track> elements never reach Apple TV; HLS subtitle playlists do.
     // Safari natively plays .m3u8, so local playback works fine.
     // Chrome/Firefox fall back to direct MP4 (they don't support AirPlay anyway).
-    const hlsUrl   = `${BACKEND_URL}/api/hls/${torrentId}/master.m3u8`;
+    const hlsUrl   = `${airplayBackendUrl}/api/hls/${torrentId}/master.m3u8`;
     const directUrl = `${BACKEND_URL}/api/video/${torrentId}`;
     // canPlayType returns 'probably' or 'maybe' for HLS on Safari, '' on others
     const preferHls = videoPlayer.canPlayType('application/vnd.apple.mpegurl') !== '';

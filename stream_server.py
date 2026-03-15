@@ -10,11 +10,29 @@ from urllib.parse import quote_plus
 import urllib.request
 import mimetypes
 import json
+import socket
 from database import DatabaseManager
 
 app = Flask(__name__, static_folder='.')
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 db = DatabaseManager()
+
+def get_lan_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1'
+    finally:
+        s.close()
+    return ip
+
+LAN_IP = get_lan_ip()
+
+@app.route('/api/system-info')
+def system_info():
+    return jsonify({'lan_ip': LAN_IP, 'port': 5001})
 
 ses = lt.session({'listen_interfaces': '0.0.0.0:6881'})
 active_torrents = {}
@@ -460,6 +478,36 @@ def get_status(torrent_id):
         'name': s.name if s.has_metadata else 'Loading...'
     })
 
+def send_file_ranged(file_path):
+    size = os.path.getsize(file_path)
+    mime, _ = mimetypes.guess_type(file_path)
+    if not mime: mime = 'video/mp4'
+
+    range_header = request.headers.get('Range', None)
+    if not range_header:
+        with open(file_path, 'rb') as f:
+            data = f.read()
+        return Response(data, 200, mimetype=mime, direct_passthrough=True)
+
+    byte1, byte2 = 0, None
+    m = re.search('(\d+)-(\d*)', range_header)
+    g = m.groups()
+    if g[0]: byte1 = int(g[0])
+    if g[1]: byte2 = int(g[1])
+
+    length = size - byte1
+    if byte2 is not None:
+        length = byte2 - byte1 + 1
+
+    with open(file_path, 'rb') as f:
+        f.seek(byte1)
+        data = f.read(length)
+
+    rv = Response(data, 206, mimetype=mime, direct_passthrough=True)
+    rv.headers.add('Content-Range', 'bytes {0}-{1}/{2}'.format(byte1, byte1 + length - 1, size))
+    rv.headers.add('Accept-Ranges', 'bytes')
+    return rv
+
 @app.route('/api/video/<torrent_id>')
 @app.route('/api/video/<torrent_id>.mp4')
 def serve_video(torrent_id):
@@ -468,7 +516,7 @@ def serve_video(torrent_id):
     
     existing_file = find_existing_file(torrent_id)
     if existing_file:
-        return send_file(existing_file, mimetype='video/mp4', conditional=True)
+        return send_file_ranged(existing_file)
 
     h = active_torrents.get(torrent_id)
     if not h: return jsonify({'error': 'Not found'}), 404
@@ -493,11 +541,7 @@ def serve_video(torrent_id):
         video_file = max(video_files, key=lambda x: x['size'])
         file_path = os.path.join('./downloads', video_file.path)
         
-        # Dynamic MIME detection
-        mime, _ = mimetypes.guess_type(file_path)
-        if not mime: mime = 'video/mp4'
-        
-        return send_file(file_path, mimetype=mime, conditional=True)
+        return send_file_ranged(file_path)
     except Exception as e:
         print(f"Video stream error: {e}")
         return jsonify({'error': 'Video readying...'}), 503

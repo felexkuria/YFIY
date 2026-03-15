@@ -470,8 +470,21 @@ function showStreamPlayer(movie, torrent) {
     })
   }).then(function (res) {
     return res.json();
-  }).then(function (data) {
+  }).then(async function (data) {
     var torrentId = data.torrent_id;
+    
+    // --- FETCH LAN IP For AirPlay --- //
+    var airplayBackendUrl = BACKEND_URL;
+    try {
+        if (BACKEND_URL.indexOf('localhost') !== -1 || BACKEND_URL.indexOf('127.0.0.1') !== -1) {
+            var siRes = await fetch("".concat(BACKEND_URL, "/api/system-info"));
+            var si = await siRes.json();
+            if (si && si.lan_ip) {
+                airplayBackendUrl = "http://".concat(si.lan_ip, ":").concat(si.port || 5001);
+            }
+        }
+    } catch(e) { console.warn("Could not fetch LAN IP", e); }
+    
     fetch("".concat(BACKEND_URL, "/api/check-download/").concat(torrentId)).then(function (r) {
       return r.json();
     }).then(function (st) {
@@ -508,7 +521,7 @@ function showStreamPlayer(movie, torrent) {
 
     // --- AirPlay: set HLS as primary source so Apple TV gets embedded subtitle tracks ---
     // Safari natively plays .m3u8; Chrome/Firefox fall back to direct MP4.
-    var hlsUrl = ''.concat(BACKEND_URL, '/api/hls/').concat(torrentId, '/master.m3u8');
+    var hlsUrl = ''.concat(airplayBackendUrl, '/api/hls/').concat(torrentId, '/master.m3u8');
     var directUrl = ''.concat(BACKEND_URL, '/api/video/').concat(torrentId);
     var preferHls = videoPlayer.canPlayType('application/vnd.apple.mpegurl') !== '';
     var primarySrc = preferHls ? hlsUrl : directUrl;
