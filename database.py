@@ -247,6 +247,8 @@ class DatabaseManager:
             ''', (state, torrent_hash.lower() if torrent_hash else None))
 
     def update_watch_progress(self, movie_id, session_id, current_time, duration):
+        current_time = float(current_time or 0)
+        duration = float(duration or 0)
         progress = (current_time / duration * 100) if duration > 0 else 0
         completed = progress >= 90
         

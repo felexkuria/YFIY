@@ -1,40 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>My Downloads - Ninja Movie Vault</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            netflix: {
-              red: '#e50914',
-              dark: '#141414',
-              gray: '#181818'
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <style type="text/tailwindcss">
-    @layer base {
-      body {
-        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body class="pb-20 md:pb-0">
-  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95 backdrop-blur-md border-b border-white/10" id="main-header">
+  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95  border-b border-white/10" id="main-header">
     <nav class="flex flex-col md:flex-row justify-between items-center px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto gap-3 md:gap-4">
       <div class="logo shrink-0 flex items-center justify-between w-full md:w-auto">
         <a href="index.html" class="no-underline">
@@ -81,7 +55,7 @@
 
   </main>
 
-  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95  border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
       <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 transition-colors">
           <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
           <span class="text-[10px] font-bold">Home</span>
@@ -100,7 +74,7 @@
       <div id="modal-content" class="w-full h-full relative"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app-es5.js?v=10"></script>
   <script>
     window.addEventListener('load', async () => {
         const movieGrid = document.getElementById('movie-grid');
@@ -206,7 +180,7 @@
                         </div>
                         <div class="absolute top-2 right-2 bg-netflix-red text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg">OFFLINE</div>
                         <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center">
+                            <div class="w-12 h-12 rounded-full bg-white/20  border border-white/30 flex items-center justify-center">
                                 <svg class="w-6 h-6 fill-white ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             </div>
                         </div>
@@ -231,7 +205,7 @@
         modalContent.innerHTML = `
             <div class="bg-black h-screen w-screen relative">
                 <button id="close-player" class="absolute top-6 left-6 md:top-10 md:left-10 text-white text-4xl md:text-5xl font-light hover:text-gray-400 transition-colors z-[6000] drop-shadow-lg">←</button>
-                <div class="absolute top-8 right-6 md:top-12 md:right-12 bg-white/20 text-white px-3 py-1 md:px-4 md:py-1.5 rounded font-black text-sm md:text-lg z-[6000] border border-white/30 backdrop-blur-md uppercase tracking-tighter">OFFLINE</div>
+                <div class="absolute top-8 right-6 md:top-12 md:right-12 bg-white/20 text-white px-3 py-1 md:px-4 md:py-1.5 rounded font-black text-sm md:text-lg z-[6000] border border-white/30  uppercase tracking-tighter">OFFLINE</div>
                 <video id="video-player" class="w-full h-full object-contain" controls autoplay webkit-playsinline playsinline x-webkit-airplay="allow" crossorigin="anonymous"></video>
             </div>
         `;

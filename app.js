@@ -39,7 +39,7 @@ async function fetchMovies(query = '', genre = '', year = '', page = 1) {
   
   const res = await fetch(url);
   const data = await res.json();
-  let movies = data.data?.movies || [];
+  let movies = data.data && data.data.movies ? data.data.movies : [];
   
   if (year) {
     movies = movies.filter(m => m.year.toString() === year);
@@ -60,7 +60,7 @@ async function fetchMovieDetails(id) {
 async function fetchSuggestions(id) {
   const res = await fetch(`${API_BASE}/movie_suggestions.json?movie_id=${id}`);
   const data = await res.json();
-  return data.data?.movies || [];
+  return data.data && data.data.movies ? data.data.movies : [];
 }
 
 function calculateSimilarity(movie, suggestions) {
@@ -89,7 +89,7 @@ function generateMagnetLink(torrent, movieTitle) {
 
 // Autocomplete Logic
 let debounceTimer;
-const autocompleteContainer = document.getElementById('autocomplete-results');
+const autocompleteContainer = document.getElementById('search-results-container');
 
 if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -97,7 +97,7 @@ if (searchInput) {
         clearTimeout(debounceTimer);
         
         if (query.length < 2) {
-            if(autocompleteContainer) autocompleteContainer.style.display = 'none';
+            if(autocompleteContainer) autocompleteContainer.style.opacity = '0';
             return;
         }
 
@@ -105,21 +105,52 @@ if (searchInput) {
             try {
                 const res = await fetch(`${API_BASE}/list_movies.json?query_term=${encodeURIComponent(query)}&limit=5`);
                 const data = await res.json();
-                const movies = data.data?.movies || [];
+                const movies = data.data && data.data.movies ? data.data.movies : [];
 
                 if (movies.length > 0 && autocompleteContainer) {
-                    autocompleteContainer.innerHTML = movies.map(movie => `
-                        <div class="autocomplete-item" onclick="window.location.href='movie.html?id=${movie.id}'">
-                            <img src="${movie.small_cover_image}" class="autocomplete-avatar" alt="${movie.title}">
-                            <div class="autocomplete-info">
-                                <h5>${movie.title}</h5>
-                                <span>${movie.year} • ⭐ ${movie.rating}</span>
+                    const topMatch = movies[0];
+                    const otherResults = movies.slice(1);
+                    
+                    let html = `
+                        <div class="search-top-match">
+                            <div class="flex-1">
+                                <span class="search-section-title">Top Match</span>
+                                <div class="top-match-card" onclick="window.location.href='movie.html?id=${topMatch.id}'">
+                                    <img src="${topMatch.background_image || topMatch.large_cover_image}" alt="${topMatch.title}">
+                                    <span class="badge">98% Match</span>
+                                    <div class="info">
+                                        <h3 class="text-xl md:text-2xl font-black text-white mb-2">${topMatch.title}</h3>
+                                        <div class="flex items-center gap-4 text-sm font-bold text-white/60">
+                                            <span>${topMatch.year}</span>
+                                            <span class="px-1.5 py-0.5 border border-white/20 rounded text-[10px] uppercase">HD</span>
+                                            <span class="text-green-500">${topMatch.rating} Rating</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    `).join('');
+                        
+                        <span class="search-section-title">Titles related to "${query}"</span>
+                        <div class="search-grid">
+                            ${otherResults.map(movie => `
+                                <div class="search-card group" onclick="window.location.href='movie.html?id=${movie.id}'">
+                                    <div class="search-card-poster">
+                                        <img src="${movie.medium_cover_image}" alt="${movie.title}">
+                                    </div>
+                                    <div class="search-card-info">
+                                        <h4>${movie.title}</h4>
+                                        <span>${movie.year} • ★ ${movie.rating}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    
+                    autocompleteContainer.innerHTML = html;
                     autocompleteContainer.style.display = 'block';
+                    autocompleteContainer.style.opacity = '1';
                 } else if(autocompleteContainer) {
-                    autocompleteContainer.style.display = 'none';
+                    autocompleteContainer.style.opacity = '0';
                 }
             } catch (err) {
                 console.error('Search error:', err);
@@ -171,7 +202,7 @@ async function renderMovieDetailPage(id) {
         document.title = `${movie.title} - Ninja Movie Vault`;
         
         const heroBgImg = movie.yt_trailer_code 
-            ? `https://img.youtube.com/vi/${movie.yt_trailer_code}/maxresdefault.jpg`
+            ? `https://img.youtube.com/vi/${movie.yt_trailer_code}/hqdefault.jpg`
             : (movie.background_image_original || movie.background_image);
             
         container.innerHTML = `
@@ -181,7 +212,7 @@ async function renderMovieDetailPage(id) {
                   <div class="video-background-container">
                       <iframe 
                           id="hero-trailer-iframe"
-                          src="https://www.youtube-nocookie.com/embed/${movie.yt_trailer_code}?autoplay=0&controls=0&mute=0&loop=1&playlist=${movie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3&cc_load_policy=1&modestbranding=1" 
+                          src="" 
                           frameborder="0" 
                           allow="autoplay; encrypted-media">
                       </iframe>
@@ -226,7 +257,7 @@ async function renderMovieDetailPage(id) {
                   <div class="info-side w-full mb-8">
                       <!-- Modern Genres UI -->
                       <div class="flex flex-wrap gap-2 mb-6">
-                          ${movie.genres.map(g => `<span class="px-4 py-1.5 bg-white/10 text-white/90 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border border-white/10 shadow-lg">${g}</span>`).join('')}
+                          ${movie.genres.map(g => `<span onclick="window.location.href='index.html?genre=${encodeURIComponent(g)}'" class="px-4 py-1.5 bg-white/10 text-white/90 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border border-white/10 shadow-lg cursor-pointer hover:bg-white/20 hover:border-white/30 transition-all duration-200">${g}</span>`).join('')}
                       </div>
                       
                       <!-- Modern Cast UI -->
@@ -235,7 +266,7 @@ async function renderMovieDetailPage(id) {
                           <h4 class="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Top Cast</h4>
                           <div class="flex flex-wrap gap-3">
                               ${movie.cast.slice(0, 5).map(c => `
-                                  <div class="flex items-center gap-3 bg-white/5 pr-4 rounded-full hover:bg-white/10 transition-all duration-300 border border-white/5 cursor-pointer hover:border-white/20 hover:-translate-y-1">
+                                  <div onclick="window.location.href='index.html?cast='+encodeURIComponent('${c.name}')" class="flex items-center gap-3 bg-white/5 pr-4 rounded-full hover:bg-white/20 transition-all duration-300 border border-white/5 cursor-pointer hover:border-netflix-red/50 hover:-translate-y-1 hover:shadow-lg hover:shadow-netflix-red/10">
                                       ${c.url_small_image 
                                           ? `<img src="${c.url_small_image}" class="w-10 h-10 rounded-full object-cover border-2 border-transparent shadow-md">` 
                                           : `<div class="w-10 h-10 rounded-full bg-netflix-red/20 flex items-center justify-center text-netflix-red text-sm border-2 border-transparent shadow-md"><i class="fa fa-user"></i></div>`}
@@ -375,8 +406,7 @@ async function renderMovieDetailPage(id) {
                 if (trailerBg && heroImg && trailerIframe) {
                     heroImg.style.opacity = '0';
                     trailerBg.style.opacity = '1';
-                    const currentSrc = trailerIframe.src;
-                    trailerIframe.src = currentSrc.replace('autoplay=0', 'autoplay=1').replace('mute=1', 'mute=0');
+                    trailerIframe.src = `https://www.youtube-nocookie.com/embed/${movie.yt_trailer_code}?autoplay=1&controls=0&mute=0&loop=1&playlist=${movie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3&cc_load_policy=1`;
                     trailerBtn.style.display = 'none';
                 }
             };
@@ -398,21 +428,22 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
   const modal = document.getElementById('modal');
   const modalContent = document.getElementById('modal-content');
   
-  modal.style.display = 'block';
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
   modalContent.innerHTML = `
     <div style="background: #000; height: 100vh; position: relative;">
       <button id="close-player" style="position: absolute; top: 40px; left: 40px; background: none; border: none; color: #fff; font-size: 5rem; cursor: pointer; z-index: 10000; line-height:1; text-shadow: 0 0 20px #000;">←</button>
-      <button id="fetch-subs-btn" style="position: absolute; top: 40px; right: 40px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.3); color: #fff; font-size: 1.2rem; cursor: pointer; z-index: 10000; padding: 10px 24px; border-radius: 6px; transition: all 0.3s ease; font-weight: bold; backdrop-filter: blur(5px);">
+      <button id="fetch-subs-btn" style="position: absolute; top: 40px; right: 40px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.3); color: #fff; font-size: 1.2rem; cursor: pointer; z-index: 10000; padding: 10px 24px; border-radius: 6px; transition: all 0.3s ease; font-weight: bold;">
         <span style="margin-right: 8px;">💬</span> Fetch Subtitles (.srt)
       </button>
       <div id="resolution-badge">Detecting...</div>
       <video id="video-player" controls autoplay style="width: 100%; height: 100%;" crossorigin="anonymous" webkit-playsinline playsinline x-webkit-airplay="allow">
       </video>
-      <div id="player-status" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 30px 50px; border-radius: 12px; color: #fff; z-index: 10001; text-align: center; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(20px);">
+      <div id="player-status" style="position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 30px 50px; border-radius: 12px; color: #fff; z-index: 10001; text-align: center; border: 1px solid rgba(255,255,255,0.1);">
           <div class="stream-loader"></div>
           <p id="player-status-text" style="font-size: 1.5rem; font-weight: 900; margin-bottom: 20px;">Connecting to Peers...</p>
           <div style="width: 400px; height: 8px; background: #333; margin: 15px auto; border-radius: 4px; overflow: hidden;">
-              <div id="player-progress-bar" style="width: 0%; height: 100%; background: var(--netflix-red); transition: width 0.3s shadow: 0 0 15px var(--netflix-red);"></div>
+              <div id="player-progress-bar" style="width: 0%; height: 100%; background: var(--color-netflix-red); transition: width 0.3s; box-shadow: 0 0 15px var(--color-netflix-red);"></div>
           </div>
           <p style="font-size: 1.1rem; color: #aaa; margin-top: 15px;">Experience Cinema Quality Stream</p>
       </div>
@@ -426,7 +457,8 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
   const resBadge = document.getElementById('resolution-badge');
 
   document.getElementById('close-player').onclick = () => {
-    modal.style.display = 'none';
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
     modalContent.innerHTML = '';
   };
 
@@ -442,87 +474,43 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
         else resBadge.textContent = torrent.quality;
     });
 
-    // --- SRT Parser ---
-    function parseSRT(srtText) {
-        const cues = [];
-        const blocks = srtText.trim().replace(/\r\n/g, '\n').split(/\n\n+/);
-        const timeRe = /(\d{2}):(\d{2}):(\d{2})[,\.](\d{3}) --> (\d{2}):(\d{2}):(\d{2})[,\.](\d{3})/;
-        for (const block of blocks) {
-            const lines = block.split('\n');
-            const match = lines[1]?.match(timeRe) || lines[0]?.match(timeRe);
-            if (!match) continue;
-            const toSec = (h, m, s, ms) => +h*3600 + +m*60 + +s + +ms/1000;
-            cues.push({
-                start: toSec(match[1], match[2], match[3], match[4]),
-                end:   toSec(match[5], match[6], match[7], match[8]),
-                text:  lines.slice(lines[0].match(/^\d+$/) ? 2 : 1).join('\n')
-            });
-        }
-        return cues;
-    }
-
-    // --- JS Subtitle Overlay (Safari bypass) ---
-    let _subtitleCues = [];
-    let _subtitleOverlay = null;
-    let _subtitleListener = null;
-
-    function startJsSubtitleRenderer(srtText) {
-        _subtitleCues = parseSRT(srtText);
-
-        // Remove previous overlay if it exists
-        if (_subtitleOverlay) _subtitleOverlay.remove();
-        if (_subtitleListener) videoPlayer.removeEventListener('timeupdate', _subtitleListener);
-
-        // Create styled overlay div
-        _subtitleOverlay = document.createElement('div');
-        _subtitleOverlay.id = 'js-subtitle-overlay';
-        Object.assign(_subtitleOverlay.style, {
-            position: 'absolute',
-            bottom: '8%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            textAlign: 'center',
-            color: '#fff',
-            fontSize: '1.8rem',
-            fontWeight: '700',
-            fontFamily: 'Arial, sans-serif',
-            textShadow: '0 0 6px #000, 0 2px 4px rgba(0,0,0,0.9)',
-            background: 'rgba(0,0,0,0.55)',
-            padding: '6px 18px',
-            borderRadius: '6px',
-            maxWidth: '80%',
-            lineHeight: '1.4',
-            zIndex: '9999',
-            pointerEvents: 'none',
-            display: 'none',
-            whiteSpace: 'pre-line'
-        });
-        videoPlayer.parentElement.appendChild(_subtitleOverlay);
-
-        _subtitleListener = () => {
-            const t = videoPlayer.currentTime;
-            const cue = _subtitleCues.find(c => t >= c.start && t <= c.end);
-            if (cue) {
-                _subtitleOverlay.textContent = cue.text;
-                _subtitleOverlay.style.display = 'block';
-            } else {
-                _subtitleOverlay.style.display = 'none';
-            }
-        };
-        videoPlayer.addEventListener('timeupdate', _subtitleListener);
-    }
-
-    // --- Helper to attach subtitle tracks (JS renderer for all browsers) ---
+    // --- Helper to attach subtitle tracks (Native for Fullscreen Support) ---
     function attachSubtitleTracks(subtitles) {
         const sub = subtitles[0];
         if (!sub) return;
-        const subUrl = `${BACKEND_URL}/api/subtitle/${torrentId}/${sub.path}?format=srt`;
-        // Use JS overlay for ALL browsers — works on Chrome, Safari, and Smart TVs
-        fetch(subUrl)
-            .then(r => r.text())
-            .then(srtText => startJsSubtitleRenderer(srtText))
-            .catch(err => console.error('Subtitle fetch failed:', err));
+        
+        // Use VTT format for native HTML5 track support
+        const subUrl = `${BACKEND_URL}/api/subtitle/${torrentId}/${sub.path}.vtt`;
+        
+        // Remove existing tracks to prevent duplicates
+        Array.from(videoPlayer.getElementsByTagName('track')).forEach(t => t.remove());
+
+        const track = document.createElement('track');
+        track.kind = 'subtitles';
+        track.label = sub.language || 'English';
+        track.srclang = 'en';
+        track.src = subUrl;
+        track.default = true;
+
+        videoPlayer.appendChild(track);
+        
+        // Force the text track to show (required for Safari/WebOS sometimes)
+        setTimeout(() => {
+            if (videoPlayer.textTracks && videoPlayer.textTracks.length > 0) {
+                videoPlayer.textTracks[0].mode = 'showing';
+            }
+        }, 500);
     }
+
+    // --- AirPlay: set HLS as primary source so Apple TV gets embedded subtitle tracks ---
+    // HTML <track> elements never reach Apple TV; HLS subtitle playlists do.
+    // Safari natively plays .m3u8, so local playback works fine.
+    // Chrome/Firefox fall back to direct MP4 (they don't support AirPlay anyway).
+    const hlsUrl   = `${BACKEND_URL}/api/hls/${torrentId}/master.m3u8`;
+    const directUrl = `${BACKEND_URL}/api/video/${torrentId}`;
+    // canPlayType returns 'probably' or 'maybe' for HLS on Safari, '' on others
+    const preferHls = videoPlayer.canPlayType('application/vnd.apple.mpegurl') !== '';
+    const primarySrc = preferHls ? hlsUrl : directUrl;
 
     // Fetch subs manual trigger
     const fetchBtn = document.getElementById('fetch-subs-btn');
@@ -582,7 +570,7 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
             if (status.progress > 1.5 || status.is_finished) {
                 clearInterval(checkStatus);
                 statusDiv.style.display = 'none';
-                videoPlayer.src = `${BACKEND_URL}/api/video/${torrentId}`;
+                videoPlayer.src = primarySrc;
                 videoPlayer.load();
                 videoPlayer.onloadedmetadata = () => {
                     // Only resume if we aren't at the very end of the movie (>95%)
@@ -634,10 +622,12 @@ function renderMovies(movies, append = false, watchHistory = [], recommendations
                     // use movie_id (watch history) with fallback to id (regular movie objects)
                     const movieId = m.movie_id || m.id;
                     const progressBar = isContinueWatching && m.progress_pct
-                        ? `<div style="width:100%; height:3px; background:#333; border-radius:2px; margin-top:6px;">
-                               <div style="width:${Math.min(m.progress_pct, 100).toFixed(1)}%; height:100%; background:var(--netflix-red); border-radius:2px;"></div>
+                        ? `<div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin-top:10px; overflow:hidden;">
+                               <div style="width:${Math.min(m.progress_pct, 100).toFixed(1)}%; height:100%; background:var(--color-netflix-red); box-shadow: 0 0 10px var(--color-netflix-red);"></div>
                            </div>
-                           <span style="font-size:0.75rem; color:#aaa;">${Math.round(m.progress_pct)}% watched</span>`
+                           <div style="display:flex; justify-content:space-between; margin-top:4px;">
+                               <span style="font-size:0.7rem; font-weight:700; color:rgba(255,255,255,0.5);">${Math.round(m.progress_pct)}% watched</span>
+                           </div>`
                         : '';
                     return `
                     <div class="card" onclick="window.location.href='movie.html?id=${movieId}'">
@@ -689,5 +679,87 @@ window.renderMovieDetailPage = renderMovieDetailPage;
 if (window.location.pathname.endsWith('movie.html')) {
     // Handled by inline script
 } else if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/') || window.location.pathname === '') {
-    updateMovies();
+    const urlParams = new URLSearchParams(window.location.search);
+    const browseGenre = urlParams.get('genre');
+    const browseCast = urlParams.get('cast');
+
+    if (browseGenre) {
+        // --- Genre Browse Mode ---
+        const header = document.querySelector('h1, .page-title') || document.getElementById('movie-grid');
+        if (movieGrid) {
+            movieGrid.innerHTML = `
+              <div style="padding: 100px 4% 40px; width:100%;">
+                <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.1em; cursor:pointer;" onclick="window.location.href='index.html'">← Back to Home</p>
+                <h2 style="font-size:2.5rem; font-weight:900; margin-bottom:8px;">All <span style="color:var(--netflix-red);">${browseGenre}</span> Movies</h2>
+              </div>
+              <div style="padding: 0 4%; width:100%; display:flex; flex-wrap:wrap; gap:16px;" id="browse-grid"></div>
+            `;
+        }
+        fetch(`${BACKEND_URL}/api/movies-by-genre?genre=${encodeURIComponent(browseGenre)}`)
+            .then(r => r.json()).then(data => {
+                const grid = document.getElementById('browse-grid');
+                if (!grid) return;
+                const movies = data.movies || [];
+                if (movies.length === 0) {
+                    grid.innerHTML = `<p style="color:var(--text-muted);padding:40px;">No movies found for "${browseGenre}".</p>`;
+                    return;
+                }
+                grid.innerHTML = movies.map(m => `
+                    <div class="card" onclick="window.location.href='movie.html?id=${m.id}'">
+                        <img src="${m.medium_cover_image}" alt="${m.title}">
+                        <div class="card-info">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                <span class="match-pct">${(m.rating*10).toFixed(0)}% Match</span>
+                                <span style="color:#bcbcbc;font-size:0.9rem;">${m.year}</span>
+                            </div>
+                            <h4>${m.title}</h4>
+                            ${m.is_local ? `<span style="position:absolute;top:10px;right:10px;background:var(--color-netflix-red);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;font-weight:bold;box-shadow:0 2px 4px rgba(0,0,0,0.5);">IN VAULT</span>` : ''}
+                        </div>
+                    </div>`).join('');
+            }).catch(() => {
+                const grid = document.getElementById('browse-grid');
+                if (grid) grid.innerHTML = '<p style="color:var(--text-muted);padding:40px;">Could not load movies. Server may be offline.</p>';
+            });
+
+    } else if (browseCast) {
+        // --- Cast Browse Mode ---
+        if (movieGrid) {
+            movieGrid.innerHTML = `
+              <div style="padding: 100px 4% 40px; width:100%;">
+                <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.1em; cursor:pointer;" onclick="window.location.href='index.html'">← Back to Home</p>
+                <h2 style="font-size:2.5rem; font-weight:900; margin-bottom:8px;">Movies with <span style="color:var(--netflix-red);">${browseCast}</span></h2>
+              </div>
+              <div style="padding: 0 4%; width:100%; display:flex; flex-wrap:wrap; gap:16px;" id="browse-grid"></div>
+            `;
+        }
+        fetch(`${BACKEND_URL}/api/movies-by-cast?name=${encodeURIComponent(browseCast)}`)
+            .then(r => r.json()).then(data => {
+                const grid = document.getElementById('browse-grid');
+                if (!grid) return;
+                const movies = data.movies || [];
+                if (movies.length === 0) {
+                    grid.innerHTML = `<p style="color:var(--text-muted);padding:40px;">No movies found for "${browseCast}".</p>`;
+                    return;
+                }
+                grid.innerHTML = movies.map(m => `
+                    <div class="card" onclick="window.location.href='movie.html?id=${m.id}'">
+                        <img src="${m.medium_cover_image}" alt="${m.title}">
+                        <div class="card-info">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                                <span class="match-pct">${(m.rating*10).toFixed(0)}% Match</span>
+                                <span style="color:#bcbcbc;font-size:0.9rem;">${m.year}</span>
+                            </div>
+                            <h4>${m.title}</h4>
+                            ${m.is_local ? `<span style="position:absolute;top:10px;right:10px;background:var(--netflix-red);color:white;font-size:0.65rem;padding:2px 6px;border-radius:4px;font-weight:bold;box-shadow:0 2px 4px rgba(0,0,0,0.5);">IN VAULT</span>` : ''}
+                        </div>
+                    </div>`).join('');
+            }).catch(() => {
+                const grid = document.getElementById('browse-grid');
+                if (grid) grid.innerHTML = '<p style="color:var(--text-muted);padding:40px;">Could not load movies. Server may be offline.</p>';
+            });
+
+    } else {
+        // --- Normal Home Mode ---
+        updateMovies();
+    }
 }

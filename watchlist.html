@@ -1,44 +1,14 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>My Watchlist - Ninja Movie Vault</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            netflix: {
-              red: '#e50914',
-              dark: '#141414',
-              gray: '#181818'
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
-          }
-        }
-      }
-    }
-  </script>
-  <style type="text/tailwindcss">
-    @layer base {
-      body {
-        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
-        -webkit-tap-highlight-color: transparent;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body class="pb-20 md:pb-0">
-  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95 backdrop-blur-md border-b border-white/10" id="main-header">
+  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95  border-b border-white/10" id="main-header">
     <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
       <div class="logo shrink-0 flex items-center gap-8">
         <a href="index.html" class="no-underline">
@@ -75,7 +45,7 @@
   </main>
 
   <!-- Bottom Navigation (Mobile) -->
-  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95  border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
       <a href="index.html" class="flex flex-col items-center gap-1 text-gray-500 hover:text-white transition-colors">
           <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
           <span class="text-[10px] font-bold">Home</span>
@@ -90,7 +60,7 @@
       </a>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app-es5.js?v=10"></script>
   <script>
     window.addEventListener('load', async () => {
         const movieGrid = document.getElementById('movie-grid');

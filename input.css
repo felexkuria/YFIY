@@ -1,0 +1,501 @@
+@import "tailwindcss";
+
+@theme {
+  --color-netflix-red: #e50914;
+  --color-netflix-dark: #141414;
+  --color-netflix-gray: #181818;
+  --color-netflix-light-gray: #222222;
+  --font-sans: "Inter", ui-sans-serif, system-ui;
+  
+  --transition: all 0.4s cubic-bezier(0.5, 0, 0.1, 1);
+  --header-height: 64px;
+  --poster-ratio: 2/3;
+}
+
+@layer base {
+  body {
+    @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+}
+
+@layer components {
+  .nav-select {
+    @apply bg-black/60 border border-white/20 rounded px-2 py-1 text-[10px] md:text-sm focus:outline-none focus:border-white transition-all cursor-pointer;
+  }
+  .nav-link {
+    @apply font-semibold text-sm hover:text-gray-300 transition-colors;
+  }
+
+  /* Recovered Styles */
+  .row { margin-bottom: clamp(2rem, 4vw, 5rem); }
+
+  .row-title {
+    font-size: clamp(1rem, 1.5vw, 1.6rem);
+    color: #fff;
+    font-weight: 900;
+    margin-bottom: 1rem;
+    letter-spacing: -0.5px;
+  }
+
+  .movie-row {
+    display: flex;
+    gap: clamp(0.75rem, 1.2vw, 1.5rem);
+    overflow-x: auto;
+    padding: 1rem 0;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+  }
+
+  .movie-row::-webkit-scrollbar { display: none; }
+
+  /* Poster Cards */
+  .card {
+    min-width: clamp(140px, 12vw, 260px);
+    width: clamp(140px, 12vw, 260px);
+    aspect-ratio: var(--poster-ratio);
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition);
+    border-radius: clamp(6px, 0.6vw, 12px);
+    overflow: hidden;
+    background: #111;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+
+  .card:hover {
+    transform: scale(1.12) translateY(-10px);
+    z-index: 500;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.9);
+  }
+
+  .card-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #000 0%, rgba(0,0,0,0.8) 60%, transparent 100%);
+    padding: 1rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: var(--transition);
+  }
+
+  .card:hover .card-info {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Hero Section */
+  .hero-banner {
+    height: 75vh;
+    width: 100vw;
+    position: relative;
+    background-color: #141414;
+    overflow: hidden;
+    transition: var(--transition);
+  }
+
+  .video-background-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .video-background-container iframe {
+    width: 100vw;
+    height: 56.25vw; /* 16:9 aspect ratio */
+    min-height: 100vh;
+    min-width: 177.77vh; /* 16:9 aspect ratio */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .hero-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #141414 0%, rgba(20,20,20,0.7) 40%, transparent 70%),
+                linear-gradient(to top, #141414 0%, rgba(20,20,20,0.5) 20%, transparent 60%);
+    z-index: 1;
+    transition: all 1s ease;
+    pointer-events: none;
+  }
+
+  .hero-banner.trailer-active .hero-overlay {
+      background: linear-gradient(to top, rgba(20, 20, 20, 0.95) 0%, rgba(20, 20, 20, 0.4) 20%, transparent 100%);
+  }
+
+  .hero-content {
+    position: absolute;
+    bottom: 12%;
+    left: 4%;
+    width: 45%;
+    z-index: 2;
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hero-banner.trailer-active .hero-content {
+      bottom: 5%;
+      transform: scale(0.85);
+      transform-origin: left bottom;
+  }
+
+  .hero-content h2 {
+    font-size: clamp(1.8rem, 3.5vw, 4.5rem);
+    line-height: 1;
+    margin-bottom: 0.75rem;
+    font-weight: 900;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+    letter-spacing: -1.5px;
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #fff;
+    flex-wrap: wrap;
+  }
+
+  .match-pct {
+    color: #46d369;
+    text-shadow: 0 0 15px rgba(70, 211, 105, 0.4);
+  }
+
+  .year-text, .runtime-text {
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .age-badge {
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    padding: 0.1rem 0.5rem;
+    font-size: 0.8rem;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .resolution-badge-meta {
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    padding: 0 0.6rem;
+    font-size: clamp(0.6rem, 1vw, 2rem);
+    border-radius: 3px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .synopsis {
+    font-size: clamp(0.8rem, 1vw, 1rem);
+    line-height: 1.55;
+    color: #d4d4d4;
+    margin-bottom: 1rem;
+    max-width: 520px;
+    font-weight: 400;
+    transition: opacity 0.5s ease;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
+  }
+
+  .hero-banner.trailer-active .synopsis {
+      opacity: 0.6;
+  }
+
+  .hero-btns {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .btn-play {
+    background-color: #fff;
+    color: #000;
+    padding: 0.55rem 1.5rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: var(--transition);
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .btn-play:hover { background-color: rgba(255,255,255,0.8); transform: scale(1.05); }
+
+  .quality-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 0.4rem;
+  }
+
+  .quality-table th {
+      text-align: left;
+      padding: 0.4rem 0.75rem;
+      color: var(--color-netflix-gray);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+  }
+
+  .quality-table tr {
+      background: #181818;
+      transition: all 0.2s;
+  }
+
+  .quality-table tr:hover {
+      background: #262626;
+      transform: scale(1.01);
+  }
+
+  .quality-table td {
+      padding: 0.5rem 0.75rem;
+      font-weight: 600;
+      font-size: 0.82rem;
+  }
+
+  .quality-table td:first-child { border-radius: 6px 0 0 6px; }
+  .quality-table td:last-child { border-radius: 0 6px 6px 0; text-align: right; }
+
+  .quality-tag {
+      background: var(--color-netflix-red);
+      padding: 0.4rem 1.2rem;
+      border-radius: 4px;
+      font-weight: 900;
+  }
+
+  .btn-table-play {
+      background: #fff;
+      color: #000;
+      padding: 0.8rem 2.5rem;
+      border-radius: 4px;
+      font-weight: 900;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+  }
+
+  /* Search Autocomplete Styles - Premium Netflix Redesign */
+  .autocomplete-item {
+    @apply flex items-center gap-5 px-6 py-4 cursor-pointer transition-all duration-300 border-b border-white/5 relative overflow-hidden;
+  }
+  .autocomplete-item:last-child { border-b: none; }
+  
+  .autocomplete-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    @apply pl-8;
+  }
+  
+  .autocomplete-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--color-netflix-red);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
+  }
+  
+  .autocomplete-item:hover::before {
+    transform: scaleY(1);
+  }
+
+  .autocomplete-avatar {
+    @apply w-12 h-16 object-cover rounded shadow-2xl transition-transform duration-500;
+  }
+  
+  .autocomplete-item:hover .autocomplete-avatar {
+    @apply scale-105;
+  }
+
+  .autocomplete-info {
+    @apply flex-1 min-w-0;
+  }
+
+  .autocomplete-info h5 {
+    @apply text-base font-bold text-white mb-1 truncate tracking-tight leading-tight;
+  }
+  
+  .autocomplete-meta {
+    @apply flex items-center gap-3 text-xs font-semibold;
+  }
+  
+  .autocomplete-year { @apply text-white/40; }
+  .autocomplete-rating { @apply text-green-400; }
+  
+  .autocomplete-play-hint {
+    @apply opacity-0 translate-x-4 transition-all duration-300 text-netflix-red;
+  }
+  
+  .autocomplete-item:hover .autocomplete-play-hint {
+    @apply opacity-100 translate-x-0;
+  }
+  #search-results-container {
+    background: rgba(20, 20, 20, 0.85);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  }
+  /* Premium Search Grid Overhaul */
+  .search-section-title {
+    @apply text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-4 block;
+  }
+  
+  .search-grid {
+    @apply grid grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-x-4 gap-y-8;
+  }
+  
+  .search-top-match {
+    @apply flex flex-col md:flex-row gap-8 mb-12;
+  }
+  
+  .top-match-card {
+    @apply w-full md:w-[340px] aspect-video relative rounded-lg overflow-hidden cursor-pointer transition-all duration-700 shadow-[0_15px_40px_rgba(0,0,0,0.8)] border border-white/5 bg-netflix-gray/20;
+  }
+  
+  .top-match-card:hover {
+    @apply scale-[1.02] border-white/20 shadow-[0_30px_60px_rgba(229,9,20,0.2)];
+  }
+  
+  .top-match-card img {
+      @apply w-full h-full object-cover opacity-80 transition-opacity duration-700;
+  }
+  
+  .top-match-card:hover img {
+      @apply opacity-100;
+  }
+  
+  .top-match-card .badge {
+      @apply absolute top-6 left-6 bg-netflix-red text-white text-[10px] font-black px-3 py-1.5 rounded tracking-tighter uppercase;
+  }
+  
+  .top-match-card .info {
+      @apply absolute bottom-0 left-0 right-0 p-6 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent;
+  }
+  
+  .search-card {
+    @apply relative cursor-pointer;
+  }
+  
+  .search-card-poster {
+    @apply aspect-[2/3] rounded-md overflow-hidden bg-netflix-gray/30 transition-all duration-500 border border-white/5;
+  }
+  
+  .search-card:hover .search-card-poster {
+    @apply scale-[1.05] border-white/20 shadow-2xl;
+  }
+  
+  .search-card-poster img {
+    @apply w-full h-full object-cover transition-transform duration-700;
+  }
+  
+  .search-card:hover .search-card-poster img {
+    @apply scale-110;
+  }
+  
+  .search-card-info {
+    @apply mt-4 transition-transform duration-500;
+  }
+  
+  .search-card:hover .search-card-info {
+    @apply translate-y-1;
+  }
+  
+  .search-card-info h4 {
+    @apply text-white font-bold text-sm truncate mb-0.5;
+  }
+  
+  .search-card-info span {
+    @apply text-xs text-white/40 font-semibold;
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+::cue {
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+#resolution-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(229, 9, 20, 0.85);
+  color: #fff;
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  font-weight: 900;
+  font-size: 0.85rem;
+  z-index: 5001;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(229, 9, 20, 0.4);
+}
+
+/* Custom Scrollbar */
+body::-webkit-scrollbar { width: 8px; }
+body::-webkit-scrollbar-track { background: #141414; }
+body::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+body::-webkit-scrollbar-thumb:hover { background: var(--color-netflix-red); }
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Queries */
+@media (max-width: 480px) {
+  .hero-banner { height: 55vh; }
+  .hero-content {
+    width: 92%;
+    bottom: 8%;
+  }
+  .hero-content h2 { font-size: 1.5rem; letter-spacing: -0.5px; }
+  .synopsis { display: none; }
+  .btn-play { padding: 0.5rem 1.1rem; font-size: 0.85rem; }
+  .quality-table th { display: none; }
+  .quality-table td { font-size: 0.75rem; padding: 0.4rem 0.5rem; }
+}
+
+@media (min-width: 481px) and (max-width: 1024px) {
+  .hero-banner { height: 60vh; }
+  .hero-content { width: 70%; }
+  .hero-content h2 { font-size: clamp(1.6rem, 3.5vw, 2.8rem); }
+  .synopsis { max-width: 90%; font-size: 0.85rem; }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .hero-banner { height: 72vh; }
+  .hero-content { width: 45%; }
+  .hero-content h2 { font-size: clamp(2rem, 3vw, 3.5rem); }
+}
+
+@media (min-width: 1800px) {
+  body { font-size: 18px; }
+  .hero-banner { height: 80vh; }
+  .hero-content h2 { font-size: clamp(3rem, 4vw, 5.5rem); }
+  .synopsis { font-size: 1.1rem; max-width: 640px; }
+  .btn-play { padding: 0.7rem 2rem; font-size: 1.1rem; }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "yfiy",
+  "version": "1.0.0",
+  "description": "## 🚀 Setup Instructions",
+  "main": "app.js",
+  "scripts": {
+    "build:css": "npx tailwindcss -i ./input.css -o ./style.css",
+    "watch:css": "npx tailwindcss -i ./input.css -o ./style.css --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/felexkuria/YFIY.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/felexkuria/YFIY/issues"
+  },
+  "homepage": "https://github.com/felexkuria/YFIY#readme",
+  "devDependencies": {
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.0",
+    "autoprefixer": "^10.4.27",
+    "babel-plugin-transform-async-to-promises": "^0.8.18",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.2.1"
+  }
+}

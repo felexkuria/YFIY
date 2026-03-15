@@ -1,61 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ninja Movies - Stream Your Vault</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            netflix: {
-              red: '#e50914',
-              dark: '#141414',
-              gray: '#181818',
-              lightGray: '#222222'
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
-          }
-        }
-      }
-    }
-  </script>
-  <style type="text/tailwindcss">
-    @layer base {
-      body {
-        @apply bg-netflix-dark text-white antialiased overflow-x-hidden select-none;
-        -webkit-tap-highlight-color: transparent;
-      }
-    }
-    @layer components {
-      .nav-select {
-        @apply bg-black/60 border border-white/20 rounded px-2 py-1 text-[10px] md:text-sm focus:outline-none focus:border-white transition-all cursor-pointer;
-      }
-      .nav-link {
-        @apply font-semibold text-sm hover:text-gray-300 transition-colors;
-      }
-    }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    .line-clamp-3 {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;  
-      overflow: hidden;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
-<body class="pb-20 md:pb-0 text-white">
+<body class="pb-20 md:pb-0 text-white bg-netflix-dark">
   <header class="fixed top-0 w-full z-[1000] transition-all duration-500 bg-gradient-to-b from-black/90 to-transparent" id="main-header">
     <!-- Main Top Bar -->
     <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
@@ -90,13 +42,24 @@
         <button id="mobile-categories" class="flex items-center gap-1">Categories <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg></button>
     </div>
     
-    <!-- Hidden Search Input Area -->
-    <div id="search-overlay" class="absolute inset-0 bg-netflix-dark z-[1100] px-4 items-center gap-4 hidden">
-        <button id="close-search" class="text-white"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg></button>
-        <div class="flex-1 relative">
-            <input type="text" id="search" placeholder="Search movies..." autocomplete="off" 
-              class="bg-transparent border-none text-white py-2 text-base w-full focus:outline-none focus:ring-0">
-            <div id="autocomplete-results" class="absolute top-full left-0 right-0 mt-4 bg-netflix-gray/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden hidden">
+    <!-- Full-Screen Search Overlay -->
+    <div id="search-overlay" class="fixed inset-0 bg-netflix-dark z-[2000] hidden flex-col transition-all duration-300 overflow-y-auto">
+        <div class="w-full max-w-[1600px] mx-auto px-4 md:px-12 py-6 flex items-center gap-6">
+            <button id="close-search" class="text-white/60 hover:text-white transition-colors">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <div class="flex-1 relative group">
+                <input type="text" id="search" placeholder="Titles, people, genres..." autocomplete="off" 
+                  class="bg-transparent border-none text-white text-xl md:text-3xl font-bold w-full focus:outline-none focus:ring-0 placeholder:text-white/20 pb-2 border-b-2 border-white/5 focus:border-netflix-red transition-all">
+                <div class="absolute right-0 bottom-2 text-white/20 group-focus-within:text-netflix-red transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto px-4 md:px-12 py-10 scrollbar-hide">
+            <div id="search-results-container" class="max-w-[1600px] mx-auto opacity-0 transition-opacity duration-500">
+                <!-- Grid results will be injected here -->
             </div>
         </div>
     </div>
@@ -105,7 +68,7 @@
   <!-- Hero Billboard Container -->
   <div id="hero-billboard"></div>
 
-  <main id="movie-grid" class="relative z-20 space-y-8 pb-12 mt-[-60px] md:mt-[-150px]">
+  <main id="movie-grid" class="relative z-20 space-y-8 pb-12 mt-4">
     <div class="flex justify-center items-center h-[40vh]">
       <div class="w-12 h-12 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
     </div>
@@ -118,7 +81,7 @@
   </div>
 
   <!-- Bottom Navigation (Mobile Only) -->
-  <div class="fixed bottom-0 w-full bg-netflix-dark/95 backdrop-blur-xl border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+  <div class="fixed bottom-0 w-full bg-netflix-dark/95  border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
       <a href="index.html" class="flex flex-col items-center gap-1 text-white group">
           <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
           <span class="text-[10px] font-bold">Home</span>
@@ -142,7 +105,7 @@
       <div id="modal-content" class="w-full h-full relative"></div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app-es5.js?v=10"></script>
   <script>
     // Search UI logic
     const searchTriggerBtn = document.getElementById('search-trigger');
@@ -160,7 +123,7 @@
         searchOverlay.classList.add('hidden');
         searchOverlay.classList.remove('flex');
         mainSearchInput.value = '';
-        document.getElementById('autocomplete-results').classList.add('hidden');
+        document.getElementById('search-results-container').style.opacity = '0';
     };
 
     window.addEventListener('load', async () => {
@@ -195,7 +158,7 @@
             if (!topMovie) return;
             
             const heroBg = topMovie.yt_trailer_code 
-                ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/maxresdefault.jpg`
+                ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/hqdefault.jpg`
                 : (topMovie.background_image || topMovie.medium_cover_image);
 
             billboard.innerHTML = `
@@ -205,7 +168,7 @@
                       <div class="video-background-container">
                           <iframe 
                               id="hero-iframe"
-                              src="https://www.youtube-nocookie.com/embed/${topMovie.yt_trailer_code}?autoplay=0&controls=0&mute=1&loop=1&playlist=${topMovie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1" 
+                              src="" 
                               frameborder="0" 
                               allow="autoplay; encrypted-media">
                           </iframe>
@@ -262,7 +225,7 @@
                           </button>
                           
                           <button onclick="window.location.href='movie.html?id=${topMovie.id}'" 
-                              class="flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 bg-gray-500/50 hover:bg-gray-500/70 text-white rounded-md font-bold text-base md:text-xl transition-all backdrop-blur-md">
+                              class="flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 bg-gray-500/50 hover:bg-gray-500/70 text-white rounded-md font-bold text-base md:text-xl transition-all ">
                               <svg class="w-6 h-6 md:w-8 md:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                               </svg>
@@ -271,7 +234,7 @@
                           
                           ${topMovie.yt_trailer_code ? `
                           <button id="hero-play-trailer" 
-                              class="flex items-center gap-2 px-4 py-3 md:py-4 ml-8 bg-transparent border border-white/40 hover:bg-white/10 hover:border-white text-white rounded-full font-medium transition-all backdrop-blur-md" title="Play Trailer">
+                              class="flex items-center gap-2 px-4 py-3 md:py-4 ml-8 bg-transparent border border-white/40 hover:bg-white/10 hover:border-white text-white rounded-full font-medium transition-all " title="Play Trailer">
                               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                               </svg>
@@ -286,13 +249,13 @@
                 const playBtn = document.getElementById('hero-play-trailer');
                 const imgBg = document.getElementById('hero-img-bg');
                 const trailerBg = document.getElementById('hero-trailer-bg');
-                const iframe = document.getElementById('hero-iframe');
+                const iframe = document.getElementById('hero-iframe'); // Get the iframe element
 
                 playBtn.onclick = () => {
                     imgBg.classList.add('opacity-0');
                     trailerBg.classList.remove('opacity-0');
                     trailerBg.classList.add('opacity-100');
-                    iframe.src += "&autoplay=1&mute=0";
+                    iframe.src = `https://www.youtube-nocookie.com/embed/${topMovie.yt_trailer_code}?autoplay=1&controls=0&mute=0&loop=1&playlist=${topMovie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1`;
                     playBtn.style.display = 'none';
                 };
             }

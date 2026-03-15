@@ -14,7 +14,12 @@ __pycache__/
 
 # Project Specific
 downloads/
+node_modules/
 temp/
 movie_vault.db
+movie_vault.db-shm
+movie_vault.db-wal
 movie_vaultab.db
 .write_test
+tailwindcss-macos-*
+*.log

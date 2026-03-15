@@ -37,6 +37,33 @@ def serve_static(path):
     return send_from_directory('.', path)
 
 def find_existing_file(torrent_hash):
+    try:
+        import sqlite3, re, glob
+        conn = sqlite3.connect('movie_vault.db')
+        cur = conn.cursor()
+        cur.execute("SELECT t.movie_id, t.quality, m.title FROM torrents t JOIN movies m ON t.movie_id = m.id WHERE LOWER(t.hash) = ?", (torrent_hash.lower(),))
+        t_row = cur.fetchone()
+        if t_row:
+            movie_id, quality, title = t_row
+            cur.execute("SELECT file_path FROM downloaded_movies WHERE movie_id = ? AND quality = ?", (movie_id, quality))
+            d_row = cur.fetchone()
+            if d_row:
+                full_path = os.path.join('./downloads', d_row[0])
+                if os.path.exists(full_path):
+                    return full_path
+            
+            title_norm = re.sub(r'[^a-z0-9]+', '', title.lower())
+            search_path = os.path.join('./downloads', '**', '*.*')
+            for file in glob.iglob(search_path, recursive=True):
+                if file.lower().endswith(('.mp4', '.mkv', '.avi')):
+                    fname = os.path.basename(file).lower()
+                    fname_norm = re.sub(r'[^a-z0-9]+', '', fname)
+                    if title_norm in fname_norm and quality.lower() in fname:
+                        # File exists but not in DB yet - check-download will save it!
+                        return file
+    except Exception as e:
+        print(f"Error checking db for existing file: {e}")
+
     h = active_torrents.get(torrent_hash)
     if h:
         s = h.status()
@@ -121,15 +148,21 @@ def check_download_status(torrent_hash):
 @app.route('/api/torrent-state/<torrent_hash>', methods=['GET'])
 def get_torrent_state(torrent_hash):
     state = db.get_torrent_state(torrent_hash)
+    
+    # If the database thinks it's not downloaded, let's double check the filesystem
+    # to catch any externally downloaded or compressed movies using our fuzzy match!
+    if state and state.get('download_state') not in ['downloaded', 'streaming']:
+        existing_file = find_existing_file(torrent_hash)
+        h = active_torrents.get(torrent_hash)
+        if existing_file:
+            state['download_state'] = 'downloaded'
+            db.update_torrent_state(torrent_hash, 'downloaded')
+        elif h:
+            state['download_state'] = 'streaming'
+            
     if state:
         return jsonify(state)
-    # Fallback: check filesystem
-    existing_file = find_existing_file(torrent_hash)
-    h = active_torrents.get(torrent_hash)
-    if existing_file:
-        return jsonify({'download_state': 'downloaded'})
-    elif h:
-        return jsonify({'download_state': 'streaming'})
+        
     return jsonify({'download_state': 'available'})
 
 @app.route('/api/torrent-state/<torrent_hash>', methods=['POST'])
@@ -203,6 +236,88 @@ def check_movie_downloaded(movie_id):
                 })
     
     return jsonify({'downloaded': False, 'partial': False})
+
+def fetch_yts(params):
+    YTS_API = 'https://movies-api.accel.li/api/v2/list_movies.json'
+    try:
+        query_string = '&'.join([f"{k}={quote_plus(str(v))}" for k, v in params.items()])
+        url = f"{YTS_API}?{query_string}"
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            if data.get('status') == 'ok':
+                return data.get('data', {}).get('movies') or []
+    except Exception as e:
+        print(f"YTS Fetch Error: {e}")
+    return []
+
+@app.route('/api/movies-by-cast')
+def movies_by_cast():
+    name = request.args.get('name', '').strip()
+    if not name:
+        return jsonify({'movies': []})
+    
+    # 1. Get local movies
+    movies_dict = {}
+    with db.get_connection() as conn:
+        local_rows = conn.execute('''
+            SELECT DISTINCT m.id, m.title, m.year, m.rating,
+                   m.cover_image AS medium_cover_image,
+                   m.background_image, m.description, m.yt_trailer_code, m.genres
+            FROM cast_members c
+            JOIN movies m ON c.movie_id = m.id
+            WHERE LOWER(c.name) = LOWER(?)
+        ''', (name,)).fetchall()
+        
+    for r in local_rows:
+        d = dict(r)
+        d['is_local'] = True
+        try: d['genres'] = json.loads(d.get('genres') or '[]')
+        except: d['genres'] = []
+        movies_dict[d['id']] = d
+        
+    # 2. Get API movies
+    api_movies = fetch_yts({'query_term': name, 'limit': 20})
+    for m in api_movies:
+        if m['id'] not in movies_dict:
+            movies_dict[m['id']] = m
+            
+    return jsonify({'movies': list(movies_dict.values()), 'cast_name': name})
+
+@app.route('/api/movies-by-genre')
+def movies_by_genre():
+    genre = request.args.get('genre', '').strip()
+    if not genre:
+        return jsonify({'movies': []})
+        
+    # 1. Get local movies
+    movies_dict = {}
+    with db.get_connection() as conn:
+        local_rows = conn.execute('''
+            SELECT id, title, year, rating,
+                   cover_image AS medium_cover_image,
+                   background_image, description, yt_trailer_code, genres
+            FROM movies
+            WHERE LOWER(genres) LIKE LOWER(?)
+            ORDER BY rating DESC
+        ''', (f'%{genre}%',)).fetchall()
+        
+    for r in local_rows:
+        d = dict(r)
+        d['is_local'] = True
+        try: d['genres'] = json.loads(d.get('genres') or '[]')
+        except: d['genres'] = []
+        movies_dict[d['id']] = d
+        
+    # 2. Get API movies
+    api_movies = fetch_yts({'genre': genre, 'limit': 50, 'sort_by': 'rating'})
+    for m in api_movies:
+        if m['id'] not in movies_dict:
+            movies_dict[m['id']] = m
+            
+    # Sort merged results by rating
+    sorted_movies = sorted(movies_dict.values(), key=lambda x: x.get('rating') or 0, reverse=True)
+            
+    return jsonify({'movies': sorted_movies, 'genre': genre})
 
 @app.route('/api/movies', methods=['POST'])
 def save_movie():
@@ -346,7 +461,11 @@ def get_status(torrent_id):
     })
 
 @app.route('/api/video/<torrent_id>')
-def stream_video(torrent_id):
+@app.route('/api/video/<torrent_id>.mp4')
+def serve_video(torrent_id):
+    if torrent_id.endswith('.mp4'):
+        torrent_id = torrent_id[:-4]
+    
     existing_file = find_existing_file(torrent_id)
     if existing_file:
         return send_file(existing_file, mimetype='video/mp4', conditional=True)
@@ -365,7 +484,7 @@ def stream_video(torrent_id):
         video_files = []
         for i in range(files.num_files()):
             f_path = files.file_path(i)
-            if f_path.lower().endswith(('.mp4', '.mkv', '.avi')):
+            if f_path.lower().endswith(('.mp4', '.mkv', '.avi', '.mov')):
                 video_files.append({'path': f_path, 'size': files.file_size(i)})
         
         if not video_files:
@@ -373,9 +492,162 @@ def stream_video(torrent_id):
             
         video_file = max(video_files, key=lambda x: x['size'])
         file_path = os.path.join('./downloads', video_file.path)
-        return send_file(file_path, mimetype='video/mp4', conditional=True)
-    except:
+        
+        # Dynamic MIME detection
+        mime, _ = mimetypes.guess_type(file_path)
+        if not mime: mime = 'video/mp4'
+        
+        return send_file(file_path, mimetype=mime, conditional=True)
+    except Exception as e:
+        print(f"Video stream error: {e}")
         return jsonify({'error': 'Video readying...'}), 503
+
+@app.route('/api/hls/<torrent_id>/master.m3u8')
+def hls_master(torrent_id):
+    """HLS master playlist -- Apple TV natively reads the subtitle media reference."""
+    base = request.host_url.rstrip('/')
+    
+    # 1. Video variant playlist
+    video_playlist_url = f"{base}/api/hls/{torrent_id}/video.m3u8"
+    
+    # 2. Subtitle variant playlist lookup
+    sub_playlist_url = None
+    try:
+        movie_info = db.get_movie_by_hash(torrent_id)
+        has_remote_sub = movie_info and movie_info.get('subtitle_url')
+        
+        # Check local files too
+        local_sub = None
+        existing = find_existing_file(torrent_id)
+        if existing:
+            dir_path = os.path.dirname(existing)
+            for f in os.listdir(dir_path):
+                if f.lower().endswith(('.srt', '.vtt')):
+                    local_sub = f
+                    break
+            if not local_sub:
+                subs_dir = os.path.join(dir_path, 'Subs')
+                if os.path.isdir(subs_dir):
+                    for f in os.listdir(subs_dir):
+                        if f.lower().endswith(('.srt', '.vtt')):
+                            local_sub = os.path.join('Subs', f)
+                            break
+                            
+        if has_remote_sub or local_sub:
+            sub_playlist_url = f"{base}/api/hls/{torrent_id}/subtitles.m3u8"
+    except Exception as e:
+        print(f"HLS master sub lookup error: {e}")
+
+    # Build the multi-variant manifest
+    # Apple TV likes hints about resolution and codecs
+    manifest = "#EXTM3U\n#EXT-X-VERSION:3\n\n"
+    if sub_playlist_url:
+        manifest += (
+            f'#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",'
+            f'DEFAULT=YES,AUTOSELECT=YES,FORCED=NO,LANGUAGE="en",'
+            f'URI="{sub_playlist_url}"\n\n'
+        )
+        manifest += f'#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2",SUBTITLES="subs"\n'
+    else:
+        manifest += f'#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"\n'
+        
+    manifest += f"{video_playlist_url}\n"
+    
+    return Response(manifest, content_type='application/vnd.apple.mpegurl',
+                    headers={
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD'
+                    })
+
+@app.route('/api/hls/<torrent_id>/video.m3u8')
+def hls_video_playlist(torrent_id):
+    """HLS Media Playlist for the video stream -- Wraps the raw MP4 in a single segment."""
+    base = request.host_url.rstrip('/')
+    video_url = f"{base}/api/video/{torrent_id}.mp4"
+    
+    # We estimate duration if possible, or just use a large number.
+    # Apple TV prefers knowing the duration but '99999' is a safe fallback.
+    duration = 7200 # default 2 hours
+    try:
+        movie_info = db.get_movie_by_hash(torrent_id)
+        if movie_info and movie_info.get('runtime'):
+            duration = int(movie_info['runtime']) * 60
+    except: pass
+
+    playlist = (
+        "#EXTM3U\n"
+        "#EXT-X-VERSION:6\n"
+        "#EXT-X-TARGETDURATION:99999\n"
+        "#EXT-X-PLAYLIST-TYPE:VOD\n"
+        "#EXT-X-MEDIA-SEQUENCE:0\n"
+        f"#EXTINF:{duration}.0,\n"
+        f"{video_url}\n"
+        "#EXT-X-ENDLIST\n"
+    )
+    return Response(playlist, content_type='application/vnd.apple.mpegurl',
+                    headers={
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD'
+                    })
+
+
+@app.route('/api/hls/<torrent_id>/subtitles.m3u8')
+def hls_subtitles(torrent_id):
+    """HLS subtitle playlist -- points to the single VTT file for the whole duration."""
+    base = request.host_url.rstrip('/')
+
+    # Determine the subtitle URL (remote or local)
+    try:
+        movie_info = db.get_movie_by_hash(torrent_id)
+        if movie_info and movie_info.get('subtitle_url'):
+            # Serve the whole thing via our proxy
+            vtt_url = f"{base}/api/subtitle/{torrent_id}/REMOTE_SUB_MARKER.vtt"
+        else:
+            # Look for a local srt/vtt
+            vtt_url = None
+            existing = find_existing_file(torrent_id)
+            if existing:
+                dir_path = os.path.dirname(existing)
+                for f in os.listdir(dir_path):
+                    if f.lower().endswith(('.srt', '.vtt')):
+                        rel = os.path.relpath(os.path.join(dir_path, f), './downloads')
+                        vtt_url = f"{base}/api/subtitle/{torrent_id}/{rel}.vtt"
+                        break
+                if not vtt_url:
+                    subs_dir = os.path.join(dir_path, 'Subs')
+                    if os.path.isdir(subs_dir):
+                        for f in os.listdir(subs_dir):
+                            if f.lower().endswith(('.srt', '.vtt')):
+                                rel = os.path.relpath(os.path.join(subs_dir, f), './downloads')
+                                vtt_url = f"{base}/api/subtitle/{torrent_id}/{rel}.vtt"
+                                break
+            if not vtt_url:
+                return "No subtitle available", 404
+    except Exception as e:
+        return f"Error: {e}", 500
+
+    # A single-segment subtitle playlist matching video duration
+    duration = 7200 # default 2 hours
+    try:
+        movie_info = db.get_movie_by_hash(torrent_id)
+        if movie_info and movie_info.get('runtime'):
+            duration = int(movie_info['runtime']) * 60
+    except: pass
+
+    playlist = (
+        "#EXTM3U\n"
+        "#EXT-X-VERSION:6\n"
+        "#EXT-X-TARGETDURATION:99999\n"
+        "#EXT-X-MEDIA-SEQUENCE:0\n"
+        f"#EXTINF:{duration}.0,\n"
+        f"{vtt_url}\n"
+        "#EXT-X-ENDLIST\n"
+    )
+    return Response(playlist, content_type='application/vnd.apple.mpegurl',
+                    headers={
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD'
+                    })
 
 @app.route('/api/watch-history', methods=['GET'])
 def get_watch_history():
@@ -389,8 +661,10 @@ def get_watch_progress(movie_id):
 
 @app.route('/api/watch-progress/<int:movie_id>', methods=['POST'])
 def save_watch_progress(movie_id):
-    data = request.json
-    db.update_watch_progress(movie_id, 'default', data.get('current_time', 0), data.get('duration', 0))
+    data = request.json or {}
+    current_time = data.get('current_time') or 0
+    duration = data.get('duration') or 0
+    db.update_watch_progress(movie_id, 'default', current_time, duration)
     return jsonify({'success': True})
 
 @app.route('/api/subtitles/<torrent_id>')
@@ -465,7 +739,11 @@ def serve_subtitle_file():
 
 @app.route('/api/subtitle/<torrent_id>/<path:path>')
 def serve_subtitle(torrent_id, path):
-    serve_raw = request.args.get('format') == 'srt'
+    serve_raw = False
+    if path.endswith('.vtt'):
+        path = path[:-4]
+    elif request.args.get('format') == 'srt':
+        serve_raw = True
     
     if path.endswith('REMOTE_SUB_MARKER'):
         movie_info = db.get_movie_by_hash(torrent_id)
