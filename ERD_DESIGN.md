@@ -9,6 +9,7 @@ erDiagram
     MOVIES ||--o{ WATCHLIST : "added to"
     MOVIES ||--o{ RECOMMENDATIONS : "is source for"
     MOVIES ||--o{ DOWNLOADED_MOVIES : "downloaded as"
+    API_CACHE |o--o| MOVIES : "caches"
 
     MOVIES {
         int id PK
