@@ -74,6 +74,18 @@
             const movies = await res.json();
             const watchlist = Array.isArray(movies) ? movies : movies.watchlist || [];
 
+            function getPosterUrl(movie) {
+                if (movie.local_poster_path) {
+                    return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+                }
+                // Fallback to mirrored YTS domain if blocked
+                let url = movie.medium_cover_image || movie.cover_image;
+                if (url && url.includes('yts.mx')) {
+                    return url.replace('yts.mx', 'img.yts.bz');
+                }
+                return url;
+            }
+
             if (watchlist.length === 0) {
                 movieGrid.innerHTML = `
                     <div class="flex flex-col items-center justify-center h-[60vh] space-y-6 md:space-y-8 text-center px-4">
@@ -96,7 +108,7 @@
             container.innerHTML = watchlist.map(m => `
                 <div class="group cursor-pointer transition-transform duration-300 active:scale-95" onclick="window.location.href='movie.html?id=${m.id}'">
                     <div class="relative aspect-[2/3] rounded overflow-hidden shadow-2xl bg-netflix-gray">
-                        <img src="${m.medium_cover_image}" class="w-full h-full object-cover" loading="lazy">
+                        <img src="${getPosterUrl(m)}" class="w-full h-full object-cover" loading="lazy" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-3 md:p-4 flex flex-col justify-end">
                             <h4 class="font-black text-xs md:text-sm truncate text-white">${m.title}</h4>
                             <div class="flex justify-between items-center mt-1">

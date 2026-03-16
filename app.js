@@ -20,6 +20,18 @@ let currentPage = 1;
 let allMovies = [];
 let downloadedHashes = new Set();
 
+function getPosterUrl(movie) {
+    if (movie.local_poster_path) {
+        return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+    }
+    // Fallback to mirrored YTS domain if blocked
+    let url = movie.medium_cover_image || movie.cover_image;
+    if (url && url.includes('yts.mx')) {
+        return url.replace('yts.mx', 'img.yts.bz');
+    }
+    return url || 'https://via.placeholder.com/210x315?text=No+Poster';
+}
+
 // Header Scroll Effect
 window.addEventListener('scroll', () => {
   const header = document.querySelector('header');
@@ -135,7 +147,7 @@ if (searchInput) {
                             ${otherResults.map(movie => `
                                 <div class="search-card group" onclick="window.location.href='movie.html?id=${movie.id}'">
                                     <div class="search-card-poster">
-                                        <img src="${movie.medium_cover_image}" alt="${movie.title}">
+                                        <img src="${getPosterUrl(movie)}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                                     </div>
                                     <div class="search-card-info">
                                         <h4>${movie.title}</h4>
@@ -351,7 +363,7 @@ async function renderMovieDetailPage(id) {
               <div class="movie-row">
                   ${rankedSuggestions.slice(0, 15).map(s => `
                       <div class="card" onclick="window.location.href='movie.html?id=${s.id}'">
-                          <img src="${s.medium_cover_image}" alt="${s.title}">
+                          <img src="${getPosterUrl(s)}" alt="${s.title}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                           <div class="card-info">
                               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                   <span class="match-pct">${s.rating * 10}% Match</span>
@@ -644,7 +656,7 @@ function renderMovies(movies, append = false, watchHistory = [], recommendations
                         : '';
                     return `
                     <div class="card" onclick="window.location.href='movie.html?id=${movieId}'">
-                        <img src="${m.medium_cover_image}">
+                        <img src="${getPosterUrl(m)}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                         <div class="card-info">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <span class="match-pct">${m.rating * 10}% Match</span>

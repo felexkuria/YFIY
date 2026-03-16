@@ -10,6 +10,9 @@ erDiagram
     MOVIES ||--o{ RECOMMENDATIONS : "is source for"
     MOVIES ||--o{ DOWNLOADED_MOVIES : "downloaded as"
     API_CACHE |o--o| MOVIES : "caches"
+    USERS ||--o{ WATCH_HISTORY : "has"
+    USERS ||--o{ WATCHLIST : "owns"
+    USERS ||--o{ RECOMMENDATIONS : "receives"
 
     MOVIES {
         int id PK
@@ -25,8 +28,17 @@ erDiagram
         string genres "JSON Array"
         string url
         string yt_trailer_code
+        string local_poster_path
         timestamp created_at
         timestamp updated_at
+    }
+
+    USERS {
+        int id PK
+        string username "UNIQUE"
+        string password_hash
+        string email
+        timestamp created_at
     }
 
     TORRENTS {

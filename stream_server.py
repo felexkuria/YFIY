@@ -256,14 +256,29 @@ def check_movie_downloaded(movie_id):
     return jsonify({'downloaded': False, 'partial': False})
 
 def fetch_yts(params):
+    import hashlib
+    param_str = json.dumps(params, sort_keys=True)
+    cache_key = f"yts_list_{hashlib.md5(param_str.encode()).hexdigest()}"
+    
+    # Try Cache
+    cached = db.get_cache(cache_key)
+    if cached:
+        print(f"[*] Cache hit for {cache_key}")
+        return cached
+
     YTS_API = 'https://movies-api.accel.li/api/v2/list_movies.json'
     try:
         query_string = '&'.join([f"{k}={quote_plus(str(v))}" for k, v in params.items()])
         url = f"{YTS_API}?{query_string}"
-        with urllib.request.urlopen(url, timeout=5) as response:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as response:
             data = json.loads(response.read().decode())
             if data.get('status') == 'ok':
-                return data.get('data', {}).get('movies') or []
+                movies = data.get('data', {}).get('movies') or []
+                # Set Cache
+                db.set_cache(cache_key, movies)
+                return movies
     except Exception as e:
         print(f"YTS Fetch Error: {e}")
     return []
@@ -280,7 +295,8 @@ def movies_by_cast():
         local_rows = conn.execute('''
             SELECT DISTINCT m.id, m.title, m.year, m.rating,
                    m.cover_image AS medium_cover_image,
-                   m.background_image, m.description, m.yt_trailer_code, m.genres
+                   m.background_image, m.description, m.yt_trailer_code, m.genres,
+                   m.local_poster_path
             FROM cast_members c
             JOIN movies m ON c.movie_id = m.id
             WHERE LOWER(c.name) = LOWER(?)
@@ -313,7 +329,8 @@ def movies_by_genre():
         local_rows = conn.execute('''
             SELECT id, title, year, rating,
                    cover_image AS medium_cover_image,
-                   background_image, description, yt_trailer_code, genres
+                   background_image, description, yt_trailer_code, genres,
+                   local_poster_path
             FROM movies
             WHERE LOWER(genres) LIKE LOWER(?)
             ORDER BY rating DESC
@@ -342,6 +359,44 @@ def save_movie():
     movie_data = request.json
     db.save_movie(movie_data)
     return jsonify({'success': True})
+
+@app.route('/api/signup', methods=['POST'])
+def signup():
+    data = request.json
+    username = data.get('username')
+    email = data.get('email')
+    password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Username and password required'}), 400
+    
+    # Simple hash for demo (in production use bcrypt)
+    import hashlib
+    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    success = db.create_user(username, pwd_hash, email)
+    if success:
+        return jsonify({'success': True, 'user': {'username': username, 'email': email}})
+    else:
+        return jsonify({'success': False, 'error': 'Username already exists'}), 400
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    user = db.get_user(username)
+    if not user:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+    import hashlib
+    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    if user['password_hash'] == pwd_hash:
+        return jsonify({'success': True, 'user': {'username': username, 'email': user['email']}})
+    else:
+        return jsonify({'success': False, 'error': 'Incorrect password'}), 401
 
 @app.route('/api/completed-movies', methods=['GET'])
 def get_completed_movies():

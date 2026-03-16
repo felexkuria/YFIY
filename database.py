@@ -109,6 +109,22 @@ class DatabaseManager:
             try:
                 conn.execute("ALTER TABLE torrents ADD COLUMN download_state TEXT DEFAULT 'available'")
             except: pass
+
+            # Migration: Ensure movies table has local_poster_path
+            try:
+                conn.execute("ALTER TABLE movies ADD COLUMN local_poster_path TEXT")
+            except: pass
+
+            # Migration: Add users table if not exists (in case schema.sql wasn't rerun)
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    email TEXT UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
     
     def get_cache(self, key):
         with self.get_connection() as conn:
@@ -153,6 +169,9 @@ class DatabaseManager:
                 movie_data.get('url'),
                 movie_data.get('yt_trailer_code')
             ))
+            
+            # Download poster locally if missing
+            self._download_poster_locally(movie_data['id'], movie_data['title'], cover_img)
             
             for torrent in movie_data.get('torrents', []):
                 conn.execute('''
@@ -394,12 +413,54 @@ class DatabaseManager:
             results = conn.execute('SELECT * FROM downloaded_movies ORDER BY added_at DESC').fetchall()
             return [dict(row) for row in results]
     
-    def get_completed_movies(self, session_id='default'):
-        with self.get_connection() as conn:
-            results = conn.execute('''
-                SELECT movie_id FROM watch_history 
-                WHERE user_session = ? AND completed = 1
-            ''', (session_id,)).fetchall()
             return [row['movie_id'] for row in results]
+
+    def create_user(self, username, password_hash, email=None):
+        with self.get_connection() as conn:
+            try:
+                conn.execute(
+                    'INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)',
+                    (username, password_hash, email)
+                )
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def get_user(self, username):
+        with self.get_connection() as conn:
+            result = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+            return dict(result) if result else None
+
+    def _download_poster_locally(self, movie_id, title, img_url):
+        if not img_url: return
+        
+        try:
+            import requests # already used in main server, but let's be safe
+            import re
+            
+            # Create a safe folder name
+            safe_title = re.sub(r'[^a-zA-Z0-9 ]', '', title)
+            movie_dir = os.path.join(os.path.dirname(self.db_path), 'downloads', safe_title)
+            os.makedirs(movie_dir, exist_ok=True)
+            
+            poster_path = os.path.join(movie_dir, 'poster.jpg')
+            if os.path.exists(poster_path):
+                # Update DB with path if missing
+                with self.get_connection() as conn:
+                    conn.execute('UPDATE movies SET local_poster_path = ? WHERE id = ?', (f"{safe_title}/poster.jpg", movie_id))
+                return
+
+            print(f"[*] Downloading poster for {title}...")
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            response = requests.get(img_url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                with open(poster_path, 'wb') as f:
+                    f.write(response.content)
+                
+                with self.get_connection() as conn:
+                    conn.execute('UPDATE movies SET local_poster_path = ? WHERE id = ?', (f"{safe_title}/poster.jpg", movie_id))
+                print(f"[✓] Poster saved to {poster_path}")
+        except Exception as e:
+            print(f"[!] Error downloading poster: {e}")
 
 db = DatabaseManager()
