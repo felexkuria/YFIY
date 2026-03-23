@@ -12,6 +12,11 @@ import mimetypes
 import json
 import socket
 from database import DatabaseManager
+import hashlib
+
+def hash_password(password):
+    """Encodes the password into a SHA-256 hash string."""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 app = Flask(__name__, static_folder='.')
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
@@ -20,10 +25,16 @@ db = DatabaseManager()
 def get_lan_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(('10.255.255.255', 1))
+        # Use a more reliable method to get the local IP
+        s.connect(('8.8.8.8', 80))
         ip = s.getsockname()[0]
     except Exception:
-        ip = '127.0.0.1'
+        try:
+            # Fallback to previous method
+            s.connect(('10.255.255.255', 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = '127.0.0.1'
     finally:
         s.close()
     return ip
@@ -140,6 +151,31 @@ def fetch_subtitlecat_url(title, year=None):
     except Exception as e:
         print(f"Subtitle fetch error: {e}")
         return None
+
+@app.route('/api/proxy-image')
+def proxy_image():
+    image_url = request.args.get('url')
+    if not image_url:
+        return "URL parameter is required", 400
+    
+    # Security: Only allow YTS-related domains
+    allowed_domains = ['yts.mx', 'yts.bz', 'yts.pm', 'yts.lt', 'yts.ag', 'googleusercontent.com', 'cloudinary.com']
+    if not any(domain in image_url for domain in allowed_domains):
+        return "Domain not allowed", 403
+
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://yts.mx/'
+        }
+        req = urllib.request.Request(image_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            content = response.read()
+            mime_type = response.info().get_content_type()
+            return Response(content, mimetype=mime_type)
+    except Exception as e:
+        print(f"Proxy error for {image_url}: {e}")
+        return f"Error fetching image: {str(e)}", 500
 
 @app.route('/api/check-download/<torrent_hash>')
 def check_download_status(torrent_hash):
@@ -361,43 +397,56 @@ def save_movie():
     return jsonify({'success': True})
 
 @app.route('/api/signup', methods=['POST'])
-def signup():
-    data = request.json
+def api_signup():
+    # 1. See exactly what the browser sent
+    print("--- DEBUG: Signup Attempt ---")
+    print(f"Headers: {request.headers.get('Content-Type')}")
+    
+    data = request.get_json(force=True)
+    print(f"Data received: {data}")
+
+    if not data:
+        return jsonify({'success': False, 'error': 'No JSON data received'}), 400
+
     username = data.get('username')
-    email = data.get('email')
     password = data.get('password')
-    
+    email = data.get('email')
+
     if not username or not password:
+        print(f"Check failed: username={username}, password={password}")
         return jsonify({'success': False, 'error': 'Username and password required'}), 400
+
+    pwd_hash = hash_password(password)
     
-    # Simple hash for demo (in production use bcrypt)
-    import hashlib
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
-    
+    print(f"Attempting to create user: {username}")
     success = db.create_user(username, pwd_hash, email)
+    
     if success:
+        print("Signup SUCCESS")
         return jsonify({'success': True, 'user': {'username': username, 'email': email}})
     else:
+        print("Signup FAILED: Username likely exists in DB")
         return jsonify({'success': False, 'error': 'Username already exists'}), 400
-
 @app.route('/api/login', methods=['POST'])
-def login():
-    data = request.json
+def api_login():
+    data = request.get_json(force=True) or {}
     username = data.get('username')
     password = data.get('password')
-    
+
+    if not username or not password:
+        return jsonify({'success': False, 'error': 'Credentials required'}), 400
+
     user = db.get_user(username)
     if not user:
         return jsonify({'success': False, 'error': 'User not found'}), 404
         
-    import hashlib
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    pwd_hash = hash_password(password)
     
-    if user['password_hash'] == pwd_hash:
-        return jsonify({'success': True, 'user': {'username': username, 'email': user['email']}})
-    else:
-        return jsonify({'success': False, 'error': 'Incorrect password'}), 401
-
+    # Adjust 'password_hash' to match whatever key your DB uses (e.g., user[2])
+    if user.get('password_hash') == pwd_hash:
+        return jsonify({'success': True, 'user': {'username': username, 'email': user.get('email')}})
+    
+    return jsonify({'success': False, 'error': 'Incorrect password'}), 401
 @app.route('/api/completed-movies', methods=['GET'])
 def get_completed_movies():
     session_id = request.args.get('session_id', 'default')
@@ -408,8 +457,8 @@ def get_watched_movies():
     session_id = request.args.get('session_id', 'default')
     with db.get_connection() as conn:
         rows = conn.execute('''
-            SELECT m.id, m.title, m.year, m.rating, m.cover_image,
-                   wh.progress_pct, wh.last_watched
+            SELECT m.id, m.title, m.year, m.rating, m.cover_image as medium_cover_image,
+                   wh.progress_pct, wh.last_watched, m.local_poster_path
             FROM watch_history wh
             JOIN movies m ON m.id = wh.movie_id
             WHERE wh.user_session = ? AND wh.completed = 1
@@ -483,16 +532,20 @@ def sync_downloads():
 
 @app.route('/api/watchlist', methods=['GET'])
 def get_watchlist():
-    return jsonify(db.get_watchlist())
+    session_id = request.args.get('session_id', 'default')
+    return jsonify(db.get_watchlist(session_id))
 
 @app.route('/api/watchlist/<int:movie_id>', methods=['POST', 'GET'])
 def add_to_watchlist(movie_id):
-    db.add_to_watchlist(movie_id)
+    data = request.json or {}
+    session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    db.add_to_watchlist(movie_id, session_id)
     return jsonify({'success': True})
 
 @app.route('/api/watchlist/<int:movie_id>', methods=['DELETE'])
 def remove_from_watchlist(movie_id):
-    db.remove_from_watchlist(movie_id)
+    session_id = request.args.get('session_id', 'default')
+    db.remove_from_watchlist(movie_id, session_id)
     return jsonify({'success': True})
 
 @app.route('/api/stream', methods=['POST'])
@@ -545,7 +598,7 @@ def send_file_ranged(file_path):
         return Response(data, 200, mimetype=mime, direct_passthrough=True)
 
     byte1, byte2 = 0, None
-    m = re.search('(\d+)-(\d*)', range_header)
+    m = re.search(r'(\d+)-(\d*)', range_header)
     g = m.groups()
     if g[0]: byte1 = int(g[0])
     if g[1]: byte2 = int(g[1])
@@ -756,14 +809,16 @@ def get_watch_history():
 
 @app.route('/api/watch-progress/<int:movie_id>', methods=['GET'])
 def get_watch_progress(movie_id):
-    return jsonify(db.get_watch_progress(movie_id, 'default') or {})
+    session_id = request.args.get('session_id', 'default')
+    return jsonify(db.get_watch_progress(movie_id, session_id) or {})
 
 @app.route('/api/watch-progress/<int:movie_id>', methods=['POST'])
 def save_watch_progress(movie_id):
     data = request.json or {}
     current_time = data.get('current_time') or 0
     duration = data.get('duration') or 0
-    db.update_watch_progress(movie_id, 'default', current_time, duration)
+    session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    db.update_watch_progress(movie_id, session_id, current_time, duration)
     return jsonify({'success': True})
 
 @app.route('/api/subtitles/<torrent_id>')
@@ -892,14 +947,16 @@ def serve_subtitle(torrent_id, path):
 
 @app.route('/api/recommendations/save/<int:movie_id>', methods=['POST'])
 def save_recommendations(movie_id):
-    data = request.json
+    data = request.json or {}
     recs = data.get('recommendations', [])
-    db.save_recommendations(movie_id, recs)
+    session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    db.save_recommendations(movie_id, recs, session_id)
     return jsonify({'success': True})
 
 @app.route('/api/recommendations', methods=['GET'])
 def get_recommendations():
-    return jsonify(db.get_all_recommendations())
+    session_id = request.args.get('session_id', 'default')
+    return jsonify(db.get_all_recommendations(session_id))
 
 
 @app.route('/api/downloads', methods=['GET'])
@@ -938,6 +995,7 @@ def get_downloads():
                 'year': db_movie.get('year', year or ''),
                 'rating': db_movie.get('rating', 0),
                 'medium_cover_image': db_movie.get('medium_cover_image', ''),
+                'local_poster_path': db_movie.get('local_poster_path', ''),
                 'movie_id': db_movie.get('id'),
                 'path': rel_path,
                 'size': stat.st_size,
@@ -956,6 +1014,10 @@ def get_downloads():
                 'size_mb': round(stat.st_size / (1024 * 1024), 2)
             })
     return jsonify(downloads)
+
+@app.route('/downloads/<path:filename>')
+def serve_downloads_static(filename):
+    return send_from_directory('./downloads', filename)
 
 @app.route('/api/play-local/<path:filepath>')
 def play_local_file(filepath):

@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Recommended For You - Ninja Movie Vault</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="tv-compat.css?v=12">
 </head>
 <body class="pb-20 md:pb-0">
   <!-- Top Navigation -->
@@ -70,7 +72,7 @@
       <div id="modal-content" class="w-full h-full relative"></div>
   </div>
 
-  <script src="app-es5.js?v=10"></script>
+  <script src="app.js?v=12"></script>
   <script>
     window.addEventListener('load', async () => {
         const movieGrid = document.getElementById('movie-grid');
@@ -80,8 +82,21 @@
         const heroPlaceholder = document.getElementById('hero-placeholder');
 
         try {
-            const res = await fetch(`${BACKEND_URL}/api/recommendations`);
+            const currentSession = window.getCurrentSession();
+            const res = await fetch(`${BACKEND_URL}/api/recommendations?session_id=${currentSession}`);
             const movies = await res.json();
+
+            function getPosterUrl(movie) {
+                if (movie.local_poster_path) {
+                    return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+                }
+                // Fallback to mirrored YTS domain if blocked
+                let url = movie.medium_cover_image || movie.cover_image;
+                if (url && url.includes('yts.mx')) {
+                    return url.replace('yts.mx', 'img.yts.bz');
+                }
+                return url || 'https://via.placeholder.com/210x315?text=No+Poster';
+            }
 
             if (!movies || movies.length === 0) {
                 loader.classList.add('hidden');
@@ -104,7 +119,7 @@
             const topMovie = movies[0];
             const heroBg = topMovie.yt_trailer_code 
                 ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/hqdefault.jpg`
-                : (topMovie.background_image || topMovie.medium_cover_image);
+                : getPosterUrl(topMovie);
 
             heroPlaceholder.innerHTML = `
               <section class="relative h-[75vh] md:h-[85vh] w-full overflow-hidden bg-black">
@@ -119,7 +134,7 @@
                       </iframe>
                       ` : ''}
                   </div>
-                  <div id="hero-img-bg" class="absolute inset-0 bg-cover bg-top scale-105" style="background-image: url('${heroBg}')"></div>
+                  <div id="hero-img-bg" class="absolute inset-0 bg-cover bg-top scale-105" style="background-image: url('${heroBg}')" onerror="this.style.backgroundImage='url(https://via.placeholder.com/1280x720?text=No+Background)'"></div>
                   <div class="absolute inset-0 bg-gradient-to-r from-black via-black/20 to-transparent z-10"></div>
                   <div class="absolute inset-0 bg-gradient-to-t from-netflix-dark via-transparent to-transparent z-10"></div>
                   
@@ -166,7 +181,7 @@
             container.innerHTML = movies.slice(1).map(m => `
                 <div class="group cursor-pointer transition-transform duration-300 active:scale-95" onclick="window.location.href='movie.html?id=${m.id}'">
                     <div class="relative aspect-[2/3] rounded overflow-hidden shadow-lg bg-netflix-gray">
-                        <img src="${m.medium_cover_image}" class="w-full h-full object-cover" loading="lazy">
+                        <img src="${getPosterUrl(m)}" class="w-full h-full object-cover" loading="lazy" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-end">
                             <h4 class="font-bold text-[10px] md:text-sm truncate text-white">${m.title}</h4>
                             <div class="flex justify-between items-center mt-1">

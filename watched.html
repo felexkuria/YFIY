@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Watched - Ninja Movie Vault</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="tv-compat.css?v=12">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
@@ -104,7 +106,7 @@
     </a>
   </div>
 
-  <script src="app-es5.js?v=10"></script>
+  <script src="app.js?v=12"></script>
   <script>
     window.addEventListener('load', async () => {
       const loader = document.getElementById('loader');
@@ -134,8 +136,20 @@
         </svg>`
       );
 
+      function getPosterUrl(movie) {
+        if (movie.local_poster_path) {
+          return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+        }
+        let url = movie.medium_cover_image || movie.cover_image;
+        if (url && url.includes('yts.mx')) {
+          return url.replace('yts.mx', 'img.yts.bz');
+        }
+        return url || PLACEHOLDER;
+      }
+
       try {
-        const res = await fetch(`${BACKEND_URL}/api/watched`);
+        const currentSession = window.getCurrentSession();
+        const res = await fetch(`${BACKEND_URL}/api/watched?session_id=${currentSession}`);
         const movies = await res.json();
 
         loader.classList.add('hidden');
@@ -155,7 +169,7 @@
         statsEl.classList.remove('hidden');
 
         container.innerHTML = movies.map(m => {
-          const img = m.cover_image || PLACEHOLDER;
+          const img = getPosterUrl(m);
           const pct = Math.round(m.progress_pct || 100);
           const circumference = 126;
           const offset = circumference - (pct / 100) * circumference;

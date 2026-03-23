@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+    <script src="auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -10,7 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="tv-compat.css?v=12">
 </head>
 <body class="pb-20 md:pb-0">
   <header class="fixed top-0 w-full z-[1000] transition-all duration-500 bg-transparent" id="main-header">
@@ -56,7 +58,7 @@
       <div id="modal-content" class="w-full h-full relative"></div>
   </div>
 
-  <script src="app-es5.js?v=10"></script>
+  <script src="app.js?v=12"></script>
   <script>
     window.addEventListener('load', () => {
         const params = new URLSearchParams(window.location.search);

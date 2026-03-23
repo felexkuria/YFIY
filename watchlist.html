@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>My Watchlist - Ninja Movie Vault</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="tv-compat.css?v=12">
 </head>
 <body class="pb-20 md:pb-0">
   <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95  border-b border-white/10" id="main-header">
@@ -60,7 +62,7 @@
       </a>
   </div>
 
-  <script src="app-es5.js?v=10"></script>
+  <script src="app.js?v=12"></script>
   <script>
     window.addEventListener('load', async () => {
         const movieGrid = document.getElementById('movie-grid');
@@ -70,7 +72,8 @@
         const countSpan = document.getElementById('watchlist-count');
 
         try {
-            const res = await fetch(`${BACKEND_URL}/api/watchlist`);
+            const currentSession = window.getCurrentSession();
+            const res = await fetch(`${BACKEND_URL}/api/watchlist?session_id=${currentSession}`);
             const movies = await res.json();
             const watchlist = Array.isArray(movies) ? movies : movies.watchlist || [];
 

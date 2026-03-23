@@ -1,0 +1,121 @@
+/* 
+  WebOS TV Compatibility Layer
+  - Converts OKLCH to RGB/HEX
+  - Provides fallbacks for flex gap
+  - Provides fallbacks for aspect-ratio
+*/
+
+:root {
+  /* OKLCH Fallbacks for Tailwind 4 Greyscale */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+
+  /* Netflix Brand Colors */
+  --color-netflix-red: #e50914;
+  --color-netflix-dark: #141414;
+  --color-netflix-gray: #181818;
+}
+
+/* Flex Gap Fallback for Older Browsers */
+@supports not (gap: 1px) {
+  .flex {
+    /* Basic fallback: add margin to children */
+  }
+  
+  .movie-row {
+    display: block !important;
+    white-space: nowrap !important;
+    overflow-x: auto !important;
+  }
+  
+  .movie-row .card {
+    display: inline-block !important;
+    margin-right: 1.5rem !important;
+    vertical-align: top !important;
+  }
+  
+  .hero-btns, .meta-row, .flex-wrap {
+    margin: -0.5rem;
+  }
+  
+  .hero-btns > *, .meta-row > *, .flex-wrap > * {
+    margin: 0.5rem;
+  }
+}
+
+/* Aspect Ratio Fallback */
+@supports not (aspect-ratio: 1/1) {
+  .card {
+    height: 0 !important;
+    padding-top: calc(100% * (3 / 2)) !important; /* 2:3 ratio */
+    position: relative !important;
+  }
+  
+  .card img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+  
+  .top-match-card {
+    height: 0 !important;
+    padding-top: 56.25% !important; /* 16:9 ratio */
+    position: relative !important;
+  }
+  
+  .top-match-card img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* Older WebOS backdrop-filter fix */
+@supports not (backdrop-filter: blur(1px)) {
+  #search-results-container, .nav-select {
+    background: rgba(20, 20, 20, 0.98) !important;
+  }
+}
+
+/* Fix for OKLCH support in CSS vars */
+body {
+  color: #fff !important;
+  background-color: #141414 !important;
+}
+
+/* Trailer Resizing for TV */
+#hero-trailer-iframe {
+  width: 100vw !important;
+  height: 56.25vw !important; /* Proper 16:9 ratio */
+  min-height: 100vh !important;
+  min-width: 177.77vh !important;
+  transform: translate(-50%, -50%) !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  border: none !important;
+}
+
+.video-background-container {
+  overflow: hidden !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.text-netflix-red { color: #e50914 !important; }
+.bg-netflix-red { background-color: #e50914 !important; }
+.border-netflix-red { border-color: #e50914 !important; }

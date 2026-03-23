@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
+  <script src="auth.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -105,7 +106,7 @@
       <div id="modal-content" class="w-full h-full relative"></div>
   </div>
 
-  <script src="app-es5.js?v=10"></script>
+  <script src="app.js?v=12"></script>
   <script>
     // Search UI logic
     const searchTriggerBtn = document.getElementById('search-trigger');
@@ -129,7 +130,8 @@
     window.addEventListener('load', async () => {
         const billboard = document.getElementById('hero-billboard');
         try {
-            const historyRes = await fetch(`${BACKEND_URL}/api/watch-history?session_id=default`);
+            const currentSession = window.getCurrentSession();
+            const historyRes = await fetch(`${BACKEND_URL}/api/watch-history?session_id=${currentSession}`);
             const watchHistory = await historyRes.json();
             
             let topMovie = null;
@@ -138,7 +140,8 @@
             if (watchHistory && watchHistory.length > 0) {
                 const incompleteMovie = watchHistory.find(m => m.progress_pct < 90);
                 if (incompleteMovie) {
-                    const movieRes = await fetch(`https://movies-api.accel.li/api/v2/movie_details.json?movie_id=${incompleteMovie.movie_id}`);
+                    const detailUrl = `https://movies-api.accel.li/api/v2/movie_details.json?movie_id=${incompleteMovie.movie_id}`.replace('yts.mx', 'img.yts.bz');
+                    const movieRes = await fetch(detailUrl);
                     const movieData = await movieRes.json();
                     topMovie = movieData.data.movie;
                     topMovie.current_time = incompleteMovie.current_time;
@@ -148,7 +151,8 @@
             }
             
             if (!topMovie) {
-                const res = await fetch(`${BACKEND_URL}/api/recommendations`);
+                const currentSession = window.getCurrentSession();
+                const res = await fetch(`${BACKEND_URL}/api/recommendations?session_id=${currentSession}`);
                 const movies = await res.json();
                 if (movies && movies.length > 0) {
                     topMovie = movies.reduce((prev, current) => (prev.rating > current.rating) ? prev : current);

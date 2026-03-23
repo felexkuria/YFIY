@@ -143,9 +143,33 @@ class DatabaseManager:
             )
     
     def save_movie(self, movie_data):
-        # Rewrite blocked YTS image domains to the working unblocked image mirror (img.yts.bz)
-        cover_img = movie_data.get('medium_cover_image', '')
+        self._process_movie_db_entry(movie_data)
+        
+        with self.get_connection() as conn:
+            for torrent in movie_data.get('torrents', []):
+                conn.execute('''
+                    INSERT OR REPLACE INTO torrents 
+                    (movie_id, quality, type, size, hash, seeds, peers, video_codec, audio_channels, subtitle_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT subtitle_url FROM torrents WHERE hash = ?), NULL))
+                ''', (
+                    movie_data['id'], 
+                    torrent.get('quality', 'Unknown'), 
+                    torrent.get('type', 'Unknown'),
+                    torrent.get('size', '0'), 
+                    torrent.get('hash', '').lower(), 
+                    torrent.get('seeds', 0),
+                    torrent.get('peers', 0), 
+                    torrent.get('video_codec'),
+                    torrent.get('audio_channels'),
+                    torrent.get('hash', '').lower()
+                ))
+
+    def _process_movie_db_entry(self, movie_data):
+        """Internal helper to save/update movie record with proper image rewriting and local posters."""
+        cover_img = movie_data.get('medium_cover_image') or movie_data.get('cover_image', '')
         bg_img = movie_data.get('background_image', '')
+        
+        # Domain rewriting for YTS
         if cover_img:
             cover_img = cover_img.replace('https://movies-api.accel.li', 'https://img.yts.bz').replace('https://yts.bz', 'https://img.yts.bz').replace('https://yts.mx', 'https://img.yts.bz')
         if bg_img:
@@ -172,24 +196,6 @@ class DatabaseManager:
             
             # Download poster locally if missing
             self._download_poster_locally(movie_data['id'], movie_data['title'], cover_img)
-            
-            for torrent in movie_data.get('torrents', []):
-                conn.execute('''
-                    INSERT OR REPLACE INTO torrents 
-                    (movie_id, quality, type, size, hash, seeds, peers, video_codec, audio_channels, subtitle_url)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT subtitle_url FROM torrents WHERE hash = ?), NULL))
-                ''', (
-                    movie_data['id'], 
-                    torrent.get('quality', 'Unknown'), 
-                    torrent.get('type', 'Unknown'),
-                    torrent.get('size', '0'), 
-                    torrent.get('hash', '').lower(), 
-                    torrent.get('seeds', 0),
-                    torrent.get('peers', 0), 
-                    torrent.get('video_codec'),
-                    torrent.get('audio_channels'),
-                    torrent.get('hash', '').lower()
-                ))
     
     def get_movie_by_hash(self, torrent_hash):
         with self.get_connection() as conn:
@@ -310,7 +316,7 @@ class DatabaseManager:
     def get_watch_history(self, session_id):
         with self.get_connection() as conn:
             results = conn.execute('''
-                SELECT wh.*, m.title, m.cover_image as medium_cover_image, m.year, m.rating
+                SELECT wh.*, m.title, m.cover_image as medium_cover_image, m.year, m.rating, m.local_poster_path
                 FROM watch_history wh
                 JOIN movies m ON wh.movie_id = m.id
                 WHERE wh.id IN (
@@ -346,7 +352,7 @@ class DatabaseManager:
     def get_watchlist(self, session_id='default'):
         with self.get_connection() as conn:
             results = conn.execute('''
-                SELECT m.id, m.title, m.year, m.rating, m.cover_image as medium_cover_image
+                SELECT m.id, m.title, m.year, m.rating, m.cover_image as medium_cover_image, m.local_poster_path
                 FROM watchlist w
                 JOIN movies m ON w.movie_id = m.id
                 WHERE w.user_session = ?
@@ -355,26 +361,9 @@ class DatabaseManager:
             return [dict(row) for row in results]
 
     def save_recommendations(self, source_movie_id, recommended_movies, session_id='default'):
-        with self.get_connection() as conn:
-            for movie in recommended_movies:
-                conn.execute('''
-                    INSERT OR REPLACE INTO movies 
-                    (id, imdb_code, title, year, rating, runtime, language, description, 
-                     cover_image, background_image, genres, url, yt_trailer_code)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    movie['id'], movie.get('imdb_code'),
-                    movie['title'], movie['year'],
-                    movie.get('rating', 0),
-                    movie.get('runtime'),
-                    movie.get('language'), movie.get('description_full'),
-                    movie.get('medium_cover_image'),
-                    movie.get('background_image'),
-                    json.dumps(movie.get('genres', [])),
-                    movie.get('url'),
-                    movie.get('yt_trailer_code')
-                ))
-                
+        for movie in recommended_movies:
+            self._process_movie_db_entry(movie)
+            with self.get_connection() as conn:
                 conn.execute('''
                     INSERT OR IGNORE INTO recommendations (source_movie_id, recommended_movie_id, user_session)
                     VALUES (?, ?, ?)
@@ -384,7 +373,7 @@ class DatabaseManager:
         with self.get_connection() as conn:
             results = conn.execute('''
                 SELECT DISTINCT m.id, m.title, m.year, m.rating, m.cover_image as medium_cover_image, 
-                                m.background_image, m.description, m.yt_trailer_code
+                                m.background_image, m.description, m.yt_trailer_code, m.local_poster_path
                 FROM recommendations r
                 JOIN movies m ON r.recommended_movie_id = m.id
                 WHERE r.user_session = ?
@@ -412,8 +401,6 @@ class DatabaseManager:
         with self.get_connection() as conn:
             results = conn.execute('SELECT * FROM downloaded_movies ORDER BY added_at DESC').fetchall()
             return [dict(row) for row in results]
-    
-            return [row['movie_id'] for row in results]
 
     def create_user(self, username, password_hash, email=None):
         with self.get_connection() as conn:

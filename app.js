@@ -192,6 +192,8 @@ async function renderMovieDetailPage(id) {
         );
         const statuses = await Promise.all(statusPromises);
 
+        const currentSession = window.getCurrentSession();
+
         // Fetch persisted DB state for each torrent
         const dbStates = await Promise.all(movie.torrents.map(t =>
             fetch(`${BACKEND_URL}/api/torrent-state/${t.hash.toLowerCase()}`)
@@ -369,14 +371,14 @@ async function renderMovieDetailPage(id) {
         const watchBtn = document.getElementById('watchlist-btn');
         if (watchBtn) {
             // First check if movie exists in DB
-            await fetch(`${BACKEND_URL}/api/movies`, {
+            await fetch(`${BACKEND_URL}/api/movies?session_id=${currentSession}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(movie)
             }).catch(() => {});
 
             // Check current status
-            const res = await fetch(`${BACKEND_URL}/api/watchlist`);
+            const res = await fetch(`${BACKEND_URL}/api/watchlist?session_id=${currentSession}`);
             const data = await res.json();
             const watchlist = Array.isArray(data) ? data : data.watchlist || [];
             if (watchlist.some(item => parseInt(item.movie_id || item.id) === parseInt(movie.id))) {
@@ -387,7 +389,11 @@ async function renderMovieDetailPage(id) {
             watchBtn.onclick = async () => {
                 const isActive = watchBtn.classList.contains('active');
                 const method = isActive ? 'DELETE' : 'POST';
-                const res = await fetch(`${BACKEND_URL}/api/watchlist/${movie.id}`, { method });
+                const res = await fetch(`${BACKEND_URL}/api/watchlist/${movie.id}?session_id=${currentSession}`, { 
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSession })
+                });
                 
                 if (res.ok) {
                     watchBtn.classList.toggle('active');
@@ -418,8 +424,8 @@ async function renderMovieDetailPage(id) {
         });
 
     } catch (err) {
-        console.error(err);
-        container.innerHTML = '<div style="padding: 100px; text-align: center;"><h2>Error loading movie.</h2><a href="index.html" style="color: var(--netflix-red);">Return to browsing</a></div>';
+        console.error("Movie Detail Error:", err);
+        container.innerHTML = `<div style="padding: 100px; text-align: center;"><h2>Error loading movie.</h2><p style="color: #aaa; margin-bottom: 20px;">${err.message}</p><a href="index.html" style="color: var(--netflix-red);">Return to browsing</a></div>`;
     }
 }
 
@@ -592,7 +598,11 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
                         fetch(`${BACKEND_URL}/api/watch-progress/${movie.id}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ current_time: currentTime, duration: videoPlayer.duration })
+                            body: JSON.stringify({ 
+                                current_time: currentTime, 
+                                duration: videoPlayer.duration,
+                                session_id: window.getCurrentSession()
+                            })
                         }).catch(() => {});
                     }
                 }, 5000);
@@ -663,10 +673,11 @@ async function updateMovies(append = false) {
   let watchHistory = [];
   let recommendations = [];
   try {
-      const hRes = await fetch(`${BACKEND_URL}/api/watch-history?session_id=default`);
+      const currentSession = window.getCurrentSession();
+      const hRes = await fetch(`${BACKEND_URL}/api/watch-history?session_id=${currentSession}`);
       watchHistory = await hRes.json();
       
-      const rRes = await fetch(`${BACKEND_URL}/api/recommendations`);
+      const rRes = await fetch(`${BACKEND_URL}/api/recommendations?session_id=${currentSession}`);
       recommendations = await rRes.json();
   } catch (e) { console.log("History or recommendations failed"); }
 
@@ -695,7 +706,7 @@ if (window.location.pathname.endsWith('movie.html')) {
               <div style="padding: 0 4%; width:100%; display:flex; flex-wrap:wrap; gap:16px;" id="browse-grid"></div>
             `;
         }
-        fetch(`${BACKEND_URL}/api/movies-by-genre?genre=${encodeURIComponent(browseGenre)}`)
+        fetch(`${BACKEND_URL}/api/movies-by-genre?genre=${encodeURIComponent(browseGenre)}&session_id=${window.getCurrentSession()}`)
             .then(r => r.json()).then(data => {
                 const grid = document.getElementById('browse-grid');
                 if (!grid) return;
@@ -732,7 +743,7 @@ if (window.location.pathname.endsWith('movie.html')) {
               <div style="padding: 0 4%; width:100%; display:flex; flex-wrap:wrap; gap:16px;" id="browse-grid"></div>
             `;
         }
-        fetch(`${BACKEND_URL}/api/movies-by-cast?name=${encodeURIComponent(browseCast)}`)
+        fetch(`${BACKEND_URL}/api/movies-by-cast?name=${encodeURIComponent(browseCast)}&session_id=${window.getCurrentSession()}`)
             .then(r => r.json()).then(data => {
                 const grid = document.getElementById('browse-grid');
                 if (!grid) return;

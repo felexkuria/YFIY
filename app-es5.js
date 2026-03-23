@@ -28,6 +28,19 @@ var API_BASE = 'https://movies-api.accel.li/api/v2';
 
 // Dynamic Backend URL
 var BACKEND_URL = window.location.protocol === 'http:' || window.location.protocol === 'https:' ? "".concat(window.location.protocol, "//").concat(window.location.host) : 'http://localhost:5001';
+
+function getPosterUrl(movie) {
+  if (movie.local_poster_path) {
+    return "".concat(BACKEND_URL, "/downloads/").concat(movie.local_poster_path);
+  }
+  var url = movie.medium_cover_image || movie.cover_image;
+  
+  if (url && (url.indexOf('yts.mx') !== -1 || url.indexOf('yts.bz') !== -1 || url.indexOf('yts.pm') !== -1 || url.indexOf('yts.lt') !== -1)) {
+    return BACKEND_URL + "/api/proxy-image?url=" + encodeURIComponent(url);
+  }
+  
+  return url || 'https://via.placeholder.com/210x315?text=No+Poster';
+}
 var searchQuery = '';
 var selectedGenre = '';
 var selectedYear = '2026';
@@ -501,7 +514,7 @@ function showStreamPlayer(movie, torrent) {
 
       // Remove existing tracks to prevent duplicates
       Array.from(videoPlayer.getElementsByTagName('track')).forEach(function (t) {
-        return t.remove();
+        t.remove();
       });
       var track = document.createElement('track');
       track.kind = 'subtitles';
@@ -541,7 +554,7 @@ function showStreamPlayer(movie, torrent) {
           if (!videoPlayer.paused) {
             videoPlayer.pause();
             setTimeout(function () {
-              return videoPlayer.play();
+              videoPlayer.play();
             }, 100);
           }
         } else {
