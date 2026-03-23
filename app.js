@@ -20,18 +20,6 @@ let currentPage = 1;
 let allMovies = [];
 let downloadedHashes = new Set();
 
-function getPosterUrl(movie) {
-    if (movie.local_poster_path) {
-        return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
-    }
-    // Fallback to mirrored YTS domain if blocked
-    let url = movie.medium_cover_image || movie.cover_image;
-    if (url && url.includes('yts.mx')) {
-        return url.replace('yts.mx', 'img.yts.bz');
-    }
-    return url || 'https://via.placeholder.com/210x315?text=No+Poster';
-}
-
 // Header Scroll Effect
 window.addEventListener('scroll', () => {
   const header = document.querySelector('header');
@@ -147,7 +135,7 @@ if (searchInput) {
                             ${otherResults.map(movie => `
                                 <div class="search-card group" onclick="window.location.href='movie.html?id=${movie.id}'">
                                     <div class="search-card-poster">
-                                        <img src="${getPosterUrl(movie)}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
+                                        <img src="${movie.medium_cover_image}" alt="${movie.title}">
                                     </div>
                                     <div class="search-card-info">
                                         <h4>${movie.title}</h4>
@@ -363,7 +351,7 @@ async function renderMovieDetailPage(id) {
               <div class="movie-row">
                   ${rankedSuggestions.slice(0, 15).map(s => `
                       <div class="card" onclick="window.location.href='movie.html?id=${s.id}'">
-                          <img src="${getPosterUrl(s)}" alt="${s.title}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
+                          <img src="${s.medium_cover_image}" alt="${s.title}">
                           <div class="card-info">
                               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                   <span class="match-pct">${s.rating * 10}% Match</span>
@@ -478,21 +466,8 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ magnet: magnetLink })
-  }).then(res => res.json()).then(async data => {
+  }).then(res => res.json()).then(data => {
     const torrentId = data.torrent_id;
-    
-    // --- FETCH LAN IP For AirPlay --- //
-    // If the user accesses the UI via localhost, AirPlay will fail because the TV tries to load localhost from itself.
-    let airplayBackendUrl = BACKEND_URL;
-    try {
-        if (BACKEND_URL.includes('localhost') || BACKEND_URL.includes('127.0.0.1')) {
-            const siRes = await fetch(`${BACKEND_URL}/api/system-info`);
-            const si = await siRes.json();
-            if (si && si.lan_ip) {
-                airplayBackendUrl = `http://${si.lan_ip}:${si.port || 5001}`;
-            }
-        }
-    } catch(e) { console.warn("Could not fetch LAN IP", e); }
     
     fetch(`${BACKEND_URL}/api/check-download/${torrentId}`).then(r => r.json()).then(st => {
         if (st.resolution) resBadge.textContent = st.resolution;
@@ -531,7 +506,7 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
     // HTML <track> elements never reach Apple TV; HLS subtitle playlists do.
     // Safari natively plays .m3u8, so local playback works fine.
     // Chrome/Firefox fall back to direct MP4 (they don't support AirPlay anyway).
-    const hlsUrl   = `${airplayBackendUrl}/api/hls/${torrentId}/master.m3u8`;
+    const hlsUrl   = `${BACKEND_URL}/api/hls/${torrentId}/master.m3u8`;
     const directUrl = `${BACKEND_URL}/api/video/${torrentId}`;
     // canPlayType returns 'probably' or 'maybe' for HLS on Safari, '' on others
     const preferHls = videoPlayer.canPlayType('application/vnd.apple.mpegurl') !== '';
@@ -656,7 +631,7 @@ function renderMovies(movies, append = false, watchHistory = [], recommendations
                         : '';
                     return `
                     <div class="card" onclick="window.location.href='movie.html?id=${movieId}'">
-                        <img src="${getPosterUrl(m)}" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
+                        <img src="${m.medium_cover_image}">
                         <div class="card-info">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                                 <span class="match-pct">${m.rating * 10}% Match</span>
