@@ -68,7 +68,8 @@ def serve_static(path):
 def find_existing_file(torrent_hash):
     try:
         import sqlite3, re, glob
-        conn = sqlite3.connect('movie_vault.db')
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'movie_vault.db')
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         cur.execute("SELECT t.movie_id, t.quality, m.title FROM torrents t JOIN movies m ON t.movie_id = m.id WHERE LOWER(t.hash) = ?", (torrent_hash.lower(),))
         t_row = cur.fetchone()
@@ -567,6 +568,7 @@ def start_stream():
     active_torrents[torrent_id] = h
     db.update_torrent_state(torrent_id, 'streaming')
     
+    print(f"[*] Stream started for {torrent_id}")
     return jsonify({'torrent_id': torrent_id, 'status': 'started'})
 
 @app.route('/api/status/<torrent_id>')
@@ -577,6 +579,9 @@ def get_status(torrent_id):
     s = h.status()
     existing_file = find_existing_file(torrent_id)
     is_finished = s.is_finished or s.progress >= 1.0 or existing_file is not None
+    
+    if not is_finished:
+        print(f"[*] Status for {torrent_id}: {s.progress*100:.1f}% | Peers: {s.num_peers} | DL: {s.download_rate/1024:.1f} KB/s")
     
     return jsonify({
         'progress': 100 if is_finished else s.progress * 100,

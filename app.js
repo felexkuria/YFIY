@@ -6,12 +6,14 @@ const modal = document.querySelector('#modal');
 const modalContent = document.querySelector('#modal-content');
 const closeBtn = document.querySelector('#close-modal');
 const loadMoreBtn = document.querySelector('#load-more');
-const API_BASE = 'https://movies-api.accel.li/api/v2';
+window.API_BASE = 'https://movies-api.accel.li/api/v2';
+const API_BASE = window.API_BASE;
 
 // Dynamic Backend URL
-const BACKEND_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:') 
+window.BACKEND_URL = (window.location.protocol === 'http:' || window.location.protocol === 'https:') 
     ? `${window.location.protocol}//${window.location.host}` 
     : 'http://localhost:5001';
+const BACKEND_URL = window.BACKEND_URL;
 
 let searchQuery = '';
 let selectedGenre = '';
