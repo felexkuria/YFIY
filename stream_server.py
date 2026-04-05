@@ -411,7 +411,7 @@ def api_signup():
 
     username = data.get('username')
     password = data.get('password')
-    email = data.get('email')
+    email = data.get('email') or None # Use None if empty string to allow multiple NULLs in UNIQUE column
 
     if not username or not password:
         print(f"Check failed: username={username}, password={password}")
@@ -420,14 +420,24 @@ def api_signup():
     pwd_hash = hash_password(password)
     
     print(f"Attempting to create user: {username}")
-    success = db.create_user(username, pwd_hash, email)
+    try:
+        success = db.create_user(username, pwd_hash, email)
+    except Exception as e:
+        print(f"Signup Database Error: {e}")
+        return jsonify({'success': False, 'error': 'Database error occurred'}), 500
     
     if success:
         print("Signup SUCCESS")
         return jsonify({'success': True, 'user': {'username': username, 'email': email}})
     else:
-        print("Signup FAILED: Username likely exists in DB")
-        return jsonify({'success': False, 'error': 'Username already exists'}), 400
+        # Check why it failed (username vs email)
+        if db.get_user(username):
+            error_msg = 'Username already exists'
+        else:
+            # If username doesn't exist, it must be the email
+            error_msg = 'Email already exists'
+        print(f"Signup FAILED: {error_msg}")
+        return jsonify({'success': False, 'error': error_msg}), 400
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json(force=True) or {}
