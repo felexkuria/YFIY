@@ -73,6 +73,16 @@ CREATE TABLE IF NOT EXISTS recommendations (
     FOREIGN KEY (recommended_movie_id) REFERENCES movies(id)
 );
 
+CREATE TABLE IF NOT EXISTS cast_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    movie_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    character_name TEXT,
+    image_url TEXT,
+    UNIQUE(movie_id, name),
+    FOREIGN KEY (movie_id) REFERENCES movies(id)
+);
+
 CREATE TABLE IF NOT EXISTS api_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cache_key TEXT UNIQUE,

@@ -19,7 +19,7 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 app = Flask(__name__, static_folder='.')
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 db = DatabaseManager()
 
 def get_lan_ip():
@@ -54,7 +54,6 @@ def add_header(response):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Range'
     response.headers['Access-Control-Expose-Headers'] = 'Content-Range, Content-Length, Accept-Ranges'
     response.headers['Accept-Ranges'] = 'bytes'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
     return response
 
 @app.route('/')
@@ -328,23 +327,27 @@ def movies_by_cast():
     
     # 1. Get local movies
     movies_dict = {}
-    with db.get_connection() as conn:
-        local_rows = conn.execute('''
-            SELECT DISTINCT m.id, m.title, m.year, m.rating,
-                   m.cover_image AS medium_cover_image,
-                   m.background_image, m.description, m.yt_trailer_code, m.genres,
-                   m.local_poster_path
-            FROM cast_members c
-            JOIN movies m ON c.movie_id = m.id
-            WHERE LOWER(c.name) = LOWER(?)
-        ''', (name,)).fetchall()
-        
-    for r in local_rows:
-        d = dict(r)
-        d['is_local'] = True
-        try: d['genres'] = json.loads(d.get('genres') or '[]')
-        except: d['genres'] = []
-        movies_dict[d['id']] = d
+    try:
+        with db.get_connection() as conn:
+            local_rows = conn.execute('''
+                SELECT DISTINCT m.id, m.title, m.year, m.rating,
+                       m.cover_image AS medium_cover_image,
+                       m.background_image, m.description, m.yt_trailer_code, m.genres,
+                       m.local_poster_path
+                FROM cast_members c
+                JOIN movies m ON c.movie_id = m.id
+                WHERE LOWER(c.name) = LOWER(?)
+            ''', (name,)).fetchall()
+            
+        for r in local_rows:
+            d = dict(r)
+            d['is_local'] = True
+            try: d['genres'] = json.loads(d.get('genres') or '[]')
+            except: d['genres'] = []
+            movies_dict[d['id']] = d
+    except Exception as e:
+        print(f"Local Cast Fetch Error: {e}")
+        # Not a fatal error, we have API fallback below
         
     # 2. Get API movies
     api_movies = fetch_yts({'query_term': name, 'limit': 20})
@@ -564,8 +567,21 @@ def start_stream():
     data = request.json
     magnet = data.get('magnet')
     params = lt.parse_magnet_uri(magnet)
-    params.save_path = './downloads'
     
+    # Get torrent hash before adding to session
+    try:
+        torrent_id = str(params.info_hashes.v1)
+    except:
+        torrent_id = str(params.info_hash)
+    
+    # If file already exists, skip torrent and return immediately
+    existing_file = find_existing_file(torrent_id)
+    if existing_file:
+        print(f"[*] File already exists for {torrent_id}, skipping torrent")
+        db.update_torrent_state(torrent_id, 'downloaded')
+        return jsonify({'torrent_id': torrent_id, 'status': 'ready'})
+    
+    params.save_path = './downloads'
     h = ses.add_torrent(params)
     try:
         h.set_flags(lt.torrent_flags.sequential_download)
@@ -584,10 +600,23 @@ def start_stream():
 @app.route('/api/status/<torrent_id>')
 def get_status(torrent_id):
     h = active_torrents.get(torrent_id)
-    if not h: return jsonify({'error': 'Not found'}), 404
+    existing_file = find_existing_file(torrent_id)
+    
+    # If the file is already fully downloaded, return finished immediately
+    # even if the torrent isn't active (e.g., after server restart)
+    if existing_file and not h:
+        return jsonify({
+            'progress': 100,
+            'download_rate': 0,
+            'num_peers': 0,
+            'is_finished': True,
+            'name': os.path.basename(existing_file)
+        })
+    
+    if not h:
+        return jsonify({'error': 'Not found'}), 404
     
     s = h.status()
-    existing_file = find_existing_file(torrent_id)
     is_finished = s.is_finished or s.progress >= 1.0 or existing_file is not None
     
     if not is_finished:
@@ -606,28 +635,52 @@ def send_file_ranged(file_path):
     mime, _ = mimetypes.guess_type(file_path)
     if not mime: mime = 'video/mp4'
 
+    CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+
     range_header = request.headers.get('Range', None)
     if not range_header:
-        with open(file_path, 'rb') as f:
-            data = f.read()
-        return Response(data, 200, mimetype=mime, direct_passthrough=True)
+        # No Range header: return a 200 with Content-Length and stream in chunks
+        # (browsers will re-request with Range once they see Accept-Ranges)
+        def generate():
+            with open(file_path, 'rb') as f:
+                while True:
+                    chunk = f.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    yield chunk
+        rv = Response(generate(), 200, mimetype=mime, direct_passthrough=True)
+        rv.headers.add('Content-Length', size)
+        rv.headers.add('Accept-Ranges', 'bytes')
+        return rv
 
     byte1, byte2 = 0, None
     m = re.search(r'(\d+)-(\d*)', range_header)
-    g = m.groups()
-    if g[0]: byte1 = int(g[0])
-    if g[1]: byte2 = int(g[1])
+    if m:
+        g = m.groups()
+        if g[0]: byte1 = int(g[0])
+        if g[1]: byte2 = int(g[1])
 
-    length = size - byte1
-    if byte2 is not None:
-        length = byte2 - byte1 + 1
+    # Cap the response to ~10MB per range request if no end byte specified
+    # This prevents loading GBs into memory and lets the browser request more as needed
+    if byte2 is None:
+        byte2 = min(byte1 + (10 * 1024 * 1024) - 1, size - 1)
 
-    with open(file_path, 'rb') as f:
-        f.seek(byte1)
-        data = f.read(length)
+    length = byte2 - byte1 + 1
 
-    rv = Response(data, 206, mimetype=mime, direct_passthrough=True)
-    rv.headers.add('Content-Range', 'bytes {0}-{1}/{2}'.format(byte1, byte1 + length - 1, size))
+    def generate_range():
+        with open(file_path, 'rb') as f:
+            f.seek(byte1)
+            remaining = length
+            while remaining > 0:
+                chunk = f.read(min(CHUNK_SIZE, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    rv = Response(generate_range(), 206, mimetype=mime, direct_passthrough=True)
+    rv.headers.add('Content-Range', 'bytes {0}-{1}/{2}'.format(byte1, byte2, size))
+    rv.headers.add('Content-Length', length)
     rv.headers.add('Accept-Ranges', 'bytes')
     return rv
 
@@ -662,7 +715,7 @@ def serve_video(torrent_id):
             return jsonify({'error': 'No video file found'}), 404
             
         video_file = max(video_files, key=lambda x: x['size'])
-        file_path = os.path.join('./downloads', video_file.path)
+        file_path = os.path.join('./downloads', video_file['path'])
         
         return send_file_ranged(file_path)
     except Exception as e:
@@ -1043,4 +1096,4 @@ def play_local_file(filepath):
 
 if __name__ == '__main__':
     os.makedirs('./downloads', exist_ok=True)
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)

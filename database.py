@@ -116,15 +116,20 @@ class DatabaseManager:
             except: pass
 
             # Migration: Add users table if not exists (in case schema.sql wasn't rerun)
+            # Migration: Ensure cast_members table exists
             conn.execute('''
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE IF NOT EXISTS cast_members (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    email TEXT UNIQUE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    movie_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    character_name TEXT,
+                    image_url TEXT,
+                    UNIQUE(movie_id, name),
+                    FOREIGN KEY (movie_id) REFERENCES movies(id)
                 )
             ''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_cast_movie ON cast_members(movie_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_cast_name ON cast_members(LOWER(name))')
     
     def get_cache(self, key):
         with self.get_connection() as conn:
@@ -193,9 +198,30 @@ class DatabaseManager:
                 movie_data.get('url'),
                 movie_data.get('yt_trailer_code')
             ))
+        
+        # Save cast members if present (separate connection to avoid lock)
+        cast = movie_data.get('cast', [])
+        if cast:
+            with self.get_connection() as conn:
+                for member in cast:
+                    conn.execute('''
+                        INSERT OR REPLACE INTO cast_members 
+                        (movie_id, name, character_name, image_url)
+                        VALUES (?, ?, ?, ?)
+                    ''', (
+                        movie_data['id'],
+                        member.get('name'),
+                        member.get('character_name'),
+                        member.get('url_small_image')
+                    ))
             
-            # Download poster locally if missing
-            self._download_poster_locally(movie_data['id'], movie_data['title'], cover_img)
+        # Download poster locally AFTER DB connections are closed (avoids lock)
+        import threading
+        threading.Thread(
+            target=self._download_poster_locally,
+            args=(movie_data['id'], movie_data['title'], cover_img),
+            daemon=True
+        ).start()
     
     def get_movie_by_hash(self, torrent_hash):
         with self.get_connection() as conn:
