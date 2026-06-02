@@ -12,6 +12,7 @@ import mimetypes
 import json
 import socket
 from database import DatabaseManager
+from recommendation_engine import RecommendationEngine
 import hashlib
 
 def hash_password(password):
@@ -21,6 +22,17 @@ def hash_password(password):
 app = Flask(__name__, static_folder='.')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 db = DatabaseManager()
+rec_engine = RecommendationEngine(db)
+
+def trigger_recommendation_refresh(session_id):
+    """Background thread to regenerate recommendations without blocking the request."""
+    def _refresh():
+        try:
+            rec_engine.refresh_recommendations(session_id)
+        except Exception as e:
+            print(f'[!] Recommendation refresh error: {e}')
+    thread = threading.Thread(target=_refresh, daemon=True)
+    thread.start()
 
 def get_lan_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -554,12 +566,16 @@ def add_to_watchlist(movie_id):
     data = request.json or {}
     session_id = data.get('session_id') or request.args.get('session_id', 'default')
     db.add_to_watchlist(movie_id, session_id)
+    # Trigger recommendation refresh in background
+    trigger_recommendation_refresh(session_id)
     return jsonify({'success': True})
 
 @app.route('/api/watchlist/<int:movie_id>', methods=['DELETE'])
 def remove_from_watchlist(movie_id):
     session_id = request.args.get('session_id', 'default')
     db.remove_from_watchlist(movie_id, session_id)
+    # Trigger recommendation refresh in background
+    trigger_recommendation_refresh(session_id)
     return jsonify({'success': True})
 
 @app.route('/api/stream', methods=['POST'])
@@ -886,7 +902,20 @@ def save_watch_progress(movie_id):
     current_time = data.get('current_time') or 0
     duration = data.get('duration') or 0
     session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    
+    # Check if this update will mark the movie as completed (>90%)
+    progress = (float(current_time) / float(duration) * 100) if float(duration) > 0 else 0
+    was_completed = False
+    existing = db.get_watch_progress(movie_id, session_id)
+    if existing and not existing.get('completed') and progress >= 90:
+        was_completed = True
+    
     db.update_watch_progress(movie_id, session_id, current_time, duration)
+    
+    # Refresh recommendations when a movie is completed (strong signal)
+    if was_completed:
+        trigger_recommendation_refresh(session_id)
+    
     return jsonify({'success': True})
 
 @app.route('/api/subtitles/<torrent_id>')
@@ -1024,7 +1053,44 @@ def save_recommendations(movie_id):
 @app.route('/api/recommendations', methods=['GET'])
 def get_recommendations():
     session_id = request.args.get('session_id', 'default')
-    return jsonify(db.get_all_recommendations(session_id))
+    
+    # Check if we have cached recommendations
+    existing = db.get_all_recommendations(session_id)
+    if existing:
+        return jsonify(existing)
+    
+    # No recommendations yet — generate them live
+    try:
+        recommendations = rec_engine.refresh_recommendations(session_id)
+        # Return the generated recommendations in the same format as DB query
+        result = []
+        for m in recommendations:
+            result.append({
+                'id': m.get('id'),
+                'title': m.get('title'),
+                'year': m.get('year'),
+                'rating': m.get('rating'),
+                'medium_cover_image': m.get('medium_cover_image') or m.get('cover_image', ''),
+                'background_image': m.get('background_image', ''),
+                'description': m.get('description_full') or m.get('description', ''),
+                'yt_trailer_code': m.get('yt_trailer_code', ''),
+                'local_poster_path': m.get('local_poster_path'),
+            })
+        return jsonify(result)
+    except Exception as e:
+        print(f'[!] Recommendation generation error: {e}')
+        return jsonify([])
+
+@app.route('/api/recommendations/refresh', methods=['POST'])
+def refresh_recommendations():
+    """Force regenerate recommendations for the current session."""
+    session_id = request.args.get('session_id') or (request.json or {}).get('session_id', 'default')
+    try:
+        recommendations = rec_engine.refresh_recommendations(session_id)
+        return jsonify({'success': True, 'count': len(recommendations)})
+    except Exception as e:
+        print(f'[!] Recommendation refresh error: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @app.route('/api/downloads', methods=['GET'])

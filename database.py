@@ -399,14 +399,16 @@ class DatabaseManager:
         with self.get_connection() as conn:
             results = conn.execute('''
                 SELECT DISTINCT m.id, m.title, m.year, m.rating, m.cover_image as medium_cover_image, 
-                                m.background_image, m.description, m.yt_trailer_code, m.local_poster_path
+                                m.background_image, m.description, m.yt_trailer_code, m.local_poster_path,
+                                m.genres
                 FROM recommendations r
                 JOIN movies m ON r.recommended_movie_id = m.id
                 WHERE r.user_session = ?
                 AND m.id NOT IN (SELECT movie_id FROM watchlist WHERE user_session = ?)
+                AND m.id NOT IN (SELECT movie_id FROM watch_history WHERE user_session = ? AND completed = 1)
                 ORDER BY m.rating DESC
                 LIMIT 100
-            ''', (session_id, session_id)).fetchall()
+            ''', (session_id, session_id, session_id)).fetchall()
             return [dict(row) for row in results]
     
     def add_downloaded_movie(self, movie_id, title, quality, file_path, file_size_mb, subtitle_paths=None):

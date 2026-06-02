@@ -1,106 +1,125 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
-  <script src="auth.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Recommended For You - Ninja Movie Vault</title>
-  <link rel="stylesheet" href="style.css?v=12">
-  <link rel="stylesheet" href="tv-compat.css?v=12">
+    <script src="auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fetch/3.6.2/fetch.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Recommended For You - Ninja Movie Vault</title>
+    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="tv-compat.css?v=12">
 </head>
+
 <body class="pb-20 md:pb-0">
-  <!-- Top Navigation -->
-  <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95  border-b border-white/10 transition-all duration-500" id="main-header">
-    <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
-      <div class="logo shrink-0 flex items-center gap-8">
-        <a href="index.html" class="no-underline">
-          <h1 class="text-3xl md:text-4xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+    <!-- Top Navigation -->
+    <header class="fixed top-0 w-full z-[1000] bg-netflix-dark/95  border-b border-white/10 transition-all duration-500"
+        id="main-header">
+        <nav class="flex items-center justify-between px-4 md:px-12 py-3 md:py-4 max-w-[1600px] mx-auto w-full">
+            <div class="logo shrink-0 flex items-center gap-8">
+                <a href="index.html" class="no-underline">
+                    <h1 class="text-3xl md:text-4xl font-black tracking-tighter uppercase text-netflix-red">Ninja</h1>
+                </a>
+                <div class="hidden md:flex items-center gap-6 ml-4">
+                    <a href="index.html" class="nav-link text-gray-300">Home</a>
+                    <a href="watchlist.html" class="nav-link text-gray-300">My List</a>
+                    <span class="nav-link text-white border-b-2 border-netflix-red pb-1">Recommendations</span>
+                    <a href="downloads.html" class="nav-link text-gray-300">Downloads</a>
+                    <a href="watched.html" class="nav-link text-gray-300">Watched</a>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 md:gap-6">
+                <div class="flex md:hidden items-center gap-4">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div
+                    class="w-8 h-8 rounded bg-blue-500 flex items-center justify-center font-bold text-xs text-white shrink-0">
+                    F</div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Billboard for Top Recommendation -->
+    <div id="hero-placeholder"></div>
+
+    <main id="movie-grid"
+        class="relative z-20 min-h-screen px-4 md:px-[4%] max-w-[1600px] mx-auto mt-[-100px] md:mt-[-150px]">
+        <!-- Loader -->
+        <div id="loader" class="flex flex-col items-center justify-center h-[60vh] space-y-4">
+            <div class="w-10 h-10 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
+            <p class="text-gray-400 font-medium animate-pulse text-sm">Finding your next favorite movie...</p>
+        </div>
+
+        <div id="content" class="hidden">
+            <h2 id="grid-title" class="text-xl md:text-3xl font-bold mb-6 text-white tracking-tight pt-12 md:pt-20">
+                Recommendations for You</h2>
+            <div id="movies-container"
+                class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6">
+                <!-- Movies will be injected here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <div
+        class="fixed bottom-0 w-full bg-netflix-dark/95  border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
+        <a href="index.html" class="flex flex-col items-center gap-1 text-gray-400">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+            </svg>
+            <span class="text-[10px]">Home</span>
         </a>
-        <div class="hidden md:flex items-center gap-6 ml-4">
-          <a href="index.html" class="nav-link text-gray-300">Home</a>
-          <a href="watchlist.html" class="nav-link text-gray-300">My List</a>
-          <span class="nav-link text-white border-b-2 border-netflix-red pb-1">Recommendations</span>
-          <a href="downloads.html" class="nav-link text-gray-300">Downloads</a>
-          <a href="watched.html" class="nav-link text-gray-300">Watched</a>
-        </div>
-      </div>
-      <div class="flex items-center gap-4 md:gap-6">
-        <div class="flex md:hidden items-center gap-4">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        </div>
-        <div class="w-8 h-8 rounded bg-blue-500 flex items-center justify-center font-bold text-xs text-white shrink-0">F</div>
-      </div>
-    </nav>
-  </header>
+        <a href="recommendations.html" class="flex flex-col items-center gap-1 text-white">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path
+                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            </svg>
+            <span class="text-[10px]">Top Picks</span>
+        </a>
+        <a href="watchlist.html" class="flex flex-col items-center gap-1 text-gray-400">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+            <span class="text-[10px]">My List</span>
+        </a>
+    </div>
 
-  <!-- Hero Billboard for Top Recommendation -->
-  <div id="hero-placeholder"></div>
+    <div id="modal" class="fixed inset-0 bg-black z-[5000] hidden flex items-center justify-center">
+        <div id="modal-content" class="w-full h-full relative"></div>
+    </div>
 
-  <main id="movie-grid" class="relative z-20 min-h-screen px-4 md:px-[4%] max-w-[1600px] mx-auto mt-[-100px] md:mt-[-150px]">
-      <!-- Loader -->
-      <div id="loader" class="flex flex-col items-center justify-center h-[60vh] space-y-4">
-          <div class="w-10 h-10 border-4 border-white/10 border-t-netflix-red rounded-full animate-spin"></div>
-          <p class="text-gray-400 font-medium animate-pulse text-sm">Finding your next favorite movie...</p>
-      </div>
-      
-      <div id="content" class="hidden">
-          <h2 id="grid-title" class="text-xl md:text-3xl font-bold mb-6 text-white tracking-tight pt-12 md:pt-20">Recommendations for You</h2>
-          <div id="movies-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-6">
-              <!-- Movies will be injected here -->
-          </div>
-      </div>
-  </main>
+    <script src="app.js?v=12"></script>
+    <script>
+        window.addEventListener('load', async () => {
+            const movieGrid = document.getElementById('movie-grid');
+            const container = document.getElementById('movies-container');
+            const contentDiv = document.getElementById('content');
+            const loader = document.getElementById('loader');
+            const heroPlaceholder = document.getElementById('hero-placeholder');
 
-  <!-- Bottom Navigation (Mobile) -->
-  <div class="fixed bottom-0 w-full bg-netflix-dark/95  border-t border-white/10 flex justify-around py-3 md:hidden z-[1000]">
-      <a href="index.html" class="flex flex-col items-center gap-1 text-gray-400">
-          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-          <span class="text-[10px]">Home</span>
-      </a>
-      <a href="recommendations.html" class="flex flex-col items-center gap-1 text-white">
-          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-          <span class="text-[10px]">Top Picks</span>
-      </a>
-      <a href="watchlist.html" class="flex flex-col items-center gap-1 text-gray-400">
-          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          <span class="text-[10px]">My List</span>
-      </a>
-  </div>
+            try {
+                const currentSession = window.getCurrentSession();
+                const res = await fetch(`${BACKEND_URL}/api/recommendations?session_id=${currentSession}`);
+                const movies = await res.json();
 
-  <div id="modal" class="fixed inset-0 bg-black z-[5000] hidden flex items-center justify-center">
-      <div id="modal-content" class="w-full h-full relative"></div>
-  </div>
-
-  <script src="app.js?v=12"></script>
-  <script>
-    window.addEventListener('load', async () => {
-        const movieGrid = document.getElementById('movie-grid');
-        const container = document.getElementById('movies-container');
-        const contentDiv = document.getElementById('content');
-        const loader = document.getElementById('loader');
-        const heroPlaceholder = document.getElementById('hero-placeholder');
-
-        try {
-            const currentSession = window.getCurrentSession();
-            const res = await fetch(`${BACKEND_URL}/api/recommendations?session_id=${currentSession}`);
-            const movies = await res.json();
-
-            function getPosterUrl(movie) {
-                if (movie.local_poster_path) {
-                    return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+                function getPosterUrl(movie) {
+                    if (movie.local_poster_path) {
+                        return `${BACKEND_URL}/downloads/${movie.local_poster_path}`;
+                    }
+                    // Fallback to mirrored YTS domain if blocked
+                    let url = movie.medium_cover_image || movie.cover_image;
+                    if (url && url.includes('yts.mx')) {
+                        return url.replace('yts.mx', 'img.yts.bz');
+                    }
+                    return url || 'https://via.placeholder.com/210x315?text=No+Poster';
                 }
-                // Fallback to mirrored YTS domain if blocked
-                let url = movie.medium_cover_image || movie.cover_image;
-                if (url && url.includes('yts.mx')) {
-                    return url.replace('yts.mx', 'img.yts.bz');
-                }
-                return url || 'https://via.placeholder.com/210x315?text=No+Poster';
-            }
 
-            if (!movies || movies.length === 0) {
-                loader.classList.add('hidden');
-                movieGrid.innerHTML = `
+                if (!movies || movies.length === 0) {
+                    loader.classList.add('hidden');
+                    movieGrid.innerHTML = `
                     <div class="flex flex-col items-center justify-center h-[70vh] space-y-6 text-center px-4 pt-24">
                         <div class="text-7xl">🎯</div>
                         <div class="space-y-2">
@@ -112,16 +131,16 @@
                         </a>
                     </div>
                 `;
-                return;
-            }
+                    return;
+                }
 
-            // Top movie for Hero Billboard
-            const topMovie = movies[0];
-            const heroBg = topMovie.yt_trailer_code 
-                ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/hqdefault.jpg`
-                : getPosterUrl(topMovie);
+                // Top movie for Hero Billboard
+                const topMovie = movies[0];
+                const heroBg = topMovie.yt_trailer_code
+                    ? `https://img.youtube.com/vi/${topMovie.yt_trailer_code}/hqdefault.jpg`
+                    : getPosterUrl(topMovie);
 
-            heroPlaceholder.innerHTML = `
+                heroPlaceholder.innerHTML = `
               <section class="relative h-[75vh] md:h-[85vh] w-full overflow-hidden bg-black">
                   <div id="hero-trailer-bg" class="absolute inset-0 z-0 opacity-0 transition-opacity duration-1000">
                       ${topMovie.yt_trailer_code ? `
@@ -160,42 +179,42 @@
               </section>
             `;
 
-            if (topMovie.yt_trailer_code) {
-                const playBtn = document.getElementById('hero-play-trailer');
-                const imgBg = document.getElementById('hero-img-bg');
-                const trailerBg = document.getElementById('hero-trailer-bg');
-                const iframe = document.getElementById('hero-iframe');
-                playBtn.onclick = () => {
-                    imgBg.classList.add('opacity-0');
-                    trailerBg.classList.remove('opacity-0');
-                    trailerBg.classList.add('opacity-100');
-                    iframe.src = `https://www.youtube-nocookie.com/embed/${topMovie.yt_trailer_code}?autoplay=1&controls=0&mute=0&loop=1&playlist=${topMovie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3`;
-                    playBtn.style.display = 'none';
-                };
-            }
+                if (topMovie.yt_trailer_code) {
+                    const playBtn = document.getElementById('hero-play-trailer');
+                    const imgBg = document.getElementById('hero-img-bg');
+                    const trailerBg = document.getElementById('hero-trailer-bg');
+                    const iframe = document.getElementById('hero-iframe');
+                    playBtn.onclick = () => {
+                        imgBg.classList.add('opacity-0');
+                        trailerBg.classList.remove('opacity-0');
+                        trailerBg.classList.add('opacity-100');
+                        iframe.src = `https://www.youtube-nocookie.com/embed/${topMovie.yt_trailer_code}?autoplay=1&controls=0&mute=0&loop=1&playlist=${topMovie.yt_trailer_code}&rel=0&showinfo=0&iv_load_policy=3`;
+                        playBtn.style.display = 'none';
+                    };
+                }
 
-            loader.classList.add('hidden');
-            contentDiv.classList.remove('hidden');
-            
-            // Render the rest of the movies in the grid
-            container.innerHTML = movies.slice(1).map(m => `
+                loader.classList.add('hidden');
+                contentDiv.classList.remove('hidden');
+
+                // Render the rest of the movies in the grid
+                container.innerHTML = movies.slice(1).map(m => `
                 <div class="group cursor-pointer transition-transform duration-300 active:scale-95" onclick="window.location.href='movie.html?id=${m.id}'">
                     <div class="relative aspect-[2/3] rounded overflow-hidden shadow-lg bg-netflix-gray">
                         <img src="${getPosterUrl(m)}" class="w-full h-full object-cover" loading="lazy" onerror="this.src='https://via.placeholder.com/210x315?text=No+Poster'">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-end">
                             <h4 class="font-bold text-[10px] md:text-sm truncate text-white">${m.title}</h4>
                             <div class="flex justify-between items-center mt-1">
-                                <span class="text-[#46d369] text-[8px] md:text-xs font-black">${m.rating * 10}% Match</span>
+                                <span class="text-[#46d369] text-[8px] md:text-xs font-black">${m._match_pct ? m._match_pct : Math.round(m.rating * 10)}% Match</span>
                             </div>
                         </div>
                     </div>
                 </div>
             `).join('');
 
-        } catch (err) {
-            console.error(err);
-            loader.classList.add('hidden');
-            movieGrid.innerHTML = `
+            } catch (err) {
+                console.error(err);
+                loader.classList.add('hidden');
+                movieGrid.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-[70vh] space-y-6 text-center px-4 pt-24">
                     <div class="text-red-600 text-5xl">⚠️</div>
                     <h2 class="text-xl font-bold text-white">Something went wrong</h2>
@@ -203,9 +222,10 @@
                     <button onclick="location.reload()" class="px-6 py-2 bg-white/10 hover:bg-white/20 rounded font-bold transition-all text-white text-sm">Try Again</button>
                 </div>
             `;
-        }
-    });
+            }
+        });
 
-  </script>
+    </script>
 </body>
+
 </html>
