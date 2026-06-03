@@ -65,17 +65,69 @@ class RecommendationEngine:
 
     def _build_user_profile(self, session_id):
         """
-        Analyze user's watchlist and watch history to build a preference profile.
-        Returns genre weights, preferred rating range, favorite decades, etc.
+        Analyze user's watchlist, watch history, explicit ratings, and taste profile
+        to build a comprehensive preference profile.
+        
+        Signal strength hierarchy (Netflix-style):
+          1. Explicit ratings (thumbs/stars) — user directly says what they like
+          2. Taste profile quiz — stated preferences at onboarding
+          3. Completion signals — finishing a movie = strongest implicit signal
+          4. Watch duration — more time spent = more interest
+          5. Watchlist — explicit intent but weaker than watching
         """
         genre_counter = Counter()
         ratings = []
         years = []
         watched_ids = set()
         watchlist_ids = set()
+        disliked_genres = Counter()  # Genres from thumbs-down movies
 
+        # --- Source 1: Taste Profile (onboarding quiz) ---
+        # This is the seed that kickstarts recommendations for new users
+        taste = self.db.get_taste_profile(session_id)
+        if taste and taste.get('genre_preferences'):
+            for genre in taste['genre_preferences']:
+                genre_counter[genre] += 2.0  # Strong initial signal
+
+            # Era preferences influence year weighting
+            era_map = {
+                'classic': 1970, 'retro': 1990, 'modern': 2010, 
+                'recent': 2020, 'new_releases': 2024
+            }
+            for era in (taste.get('era_preferences') or []):
+                if era in era_map:
+                    years.append(era_map[era])
+
+        # --- Source 2: Explicit Ratings (strongest signal) ---
+        user_ratings = self.db.get_all_user_ratings(session_id)
+        for r in user_ratings:
+            movie_genres = json.loads(r['genres'] or '[]') if r.get('genres') else []
+            
+            if r['rating_type'] == 'thumbs':
+                if r['rating_value'] > 0:  # Thumbs up
+                    for g in movie_genres:
+                        genre_counter[g] += 3.0  # Strongest positive signal
+                    if r.get('movie_rating'):
+                        ratings.append(r['movie_rating'])
+                else:  # Thumbs down
+                    for g in movie_genres:
+                        disliked_genres[g] += 2.0
+            elif r['rating_type'] == 'stars':
+                # 4-5 stars = positive, 1-2 stars = negative, 3 = neutral
+                star_val = r['rating_value']
+                if star_val >= 4:
+                    weight = (star_val - 3) * 2.0  # 4★=2.0, 5★=4.0
+                    for g in movie_genres:
+                        genre_counter[g] += weight
+                    if r.get('movie_rating'):
+                        ratings.append(r['movie_rating'])
+                elif star_val <= 2:
+                    weight = (3 - star_val) * 1.5  # 2★=1.5, 1★=3.0
+                    for g in movie_genres:
+                        disliked_genres[g] += weight
+
+        # --- Source 3: Watchlist (explicit interest) ---
         with self.db.get_connection() as conn:
-            # Watchlist movies (explicit interest signal)
             watchlist_rows = conn.execute('''
                 SELECT m.id, m.genres, m.rating, m.year
                 FROM watchlist w JOIN movies m ON w.movie_id = m.id
@@ -85,7 +137,6 @@ class RecommendationEngine:
             for row in watchlist_rows:
                 watchlist_ids.add(row['id'])
                 genres = json.loads(row['genres'] or '[]')
-                # Watchlist = moderate signal (1.0x weight per genre)
                 for g in genres:
                     genre_counter[g] += 1.0
                 if row['rating']:
@@ -93,7 +144,7 @@ class RecommendationEngine:
                 if row['year']:
                     years.append(row['year'])
 
-            # Watch history (behavioral signal — stronger than watchlist)
+            # --- Source 4: Watch History (behavioral signal) ---
             history_rows = conn.execute('''
                 SELECT m.id, m.genres, m.rating, m.year,
                        wh.progress_pct, wh.completed, wh.last_watched
@@ -107,7 +158,7 @@ class RecommendationEngine:
                 genres = json.loads(row['genres'] or '[]')
                 progress = row['progress_pct'] or 0
 
-                # Weight by engagement: completed = 2.5x, >50% = 1.5x, started = 0.5x
+                # Weight by engagement depth
                 if row['completed']:
                     weight = 2.5
                 elif progress > 50:
@@ -115,13 +166,14 @@ class RecommendationEngine:
                 elif progress > 10:
                     weight = 0.8
                 else:
-                    weight = 0.3
+                    # Watched < 10% then stopped = possible dislike signal
+                    weight = 0.2
 
                 # Temporal decay: recent watches matter more
                 try:
                     last_watched = datetime.fromisoformat(row['last_watched'])
                     days_ago = (datetime.now() - last_watched).days
-                    decay = max(0.3, 1.0 - (days_ago / 90))  # Decays over 90 days
+                    decay = max(0.3, 1.0 - (days_ago / 90))
                 except:
                     decay = 0.5
 
@@ -133,9 +185,14 @@ class RecommendationEngine:
                 if row['year']:
                     years.append(row['year'])
 
+        # --- Subtract disliked genres from the profile ---
+        for genre, penalty in disliked_genres.items():
+            if genre in genre_counter:
+                genre_counter[genre] = max(0, genre_counter[genre] - penalty)
+
         # Normalize genre weights to percentages
         total_genre_weight = sum(genre_counter.values()) or 1
-        genre_weights = {g: w / total_genre_weight for g, w in genre_counter.most_common(15)}
+        genre_weights = {g: w / total_genre_weight for g, w in genre_counter.most_common(15) if w > 0}
 
         # Rating preference (mean ± std)
         avg_rating = sum(ratings) / len(ratings) if ratings else 7.0
@@ -146,13 +203,14 @@ class RecommendationEngine:
 
         return {
             'genre_weights': genre_weights,
+            'disliked_genres': dict(disliked_genres),
             'avg_rating': avg_rating,
             'rating_std': max(rating_std, 0.5),
             'avg_year': avg_year,
             'watched_ids': watched_ids,
             'watchlist_ids': watchlist_ids,
             'exclude_ids': watched_ids | watchlist_ids,
-            'top_genres': [g for g, _ in genre_counter.most_common(5)],
+            'top_genres': [g for g, _ in genre_counter.most_common(5) if genre_counter[g] > 0],
         }
 
     def _gather_candidates(self, profile, session_id):
@@ -213,6 +271,7 @@ class RecommendationEngine:
         """Score each candidate movie against the user profile."""
         scored = []
         genre_weights = profile['genre_weights']
+        disliked_genres = profile.get('disliked_genres', {})
         avg_rating = profile['avg_rating']
         rating_std = profile['rating_std']
         avg_year = profile['avg_year']
@@ -227,16 +286,18 @@ class RecommendationEngine:
             genre_score = 0
             if genres and genre_weights:
                 matched_weight = sum(genre_weights.get(g, 0) for g in genres)
-                # Normalize by number of genres to not penalize single-genre movies
                 genre_score = min(matched_weight / (len(genres) * 0.15 + 0.01), 1.0)
             score += genre_score * self.WEIGHTS['genre_match']
+
+            # Penalty for disliked genres
+            if disliked_genres and genres:
+                dislike_penalty = sum(disliked_genres.get(g, 0) for g in genres)
+                score -= min(dislike_penalty * 5, 25)  # Cap penalty at -25
 
             # 2. Rating Fit Score (0-20) — Gaussian distance from user's preferred rating
             if rating > 0:
                 distance = abs(rating - avg_rating)
-                # Bell curve: closer = higher score
                 rating_score = math.exp(-(distance ** 2) / (2 * rating_std ** 2))
-                # Bonus for high-rated movies (everyone likes quality)
                 if rating >= 8.0:
                     rating_score = min(rating_score + 0.2, 1.0)
             else:
@@ -246,7 +307,7 @@ class RecommendationEngine:
             # 3. Recency Score (0-10) — Newer movies get a boost
             current_year = datetime.now().year
             years_old = max(0, current_year - year)
-            recency_score = max(0, 1.0 - (years_old / 30))  # Linear decay over 30 years
+            recency_score = max(0, 1.0 - (years_old / 30))
             score += recency_score * self.WEIGHTS['recency']
 
             # 4. Popularity Score (0-10)
@@ -264,13 +325,14 @@ class RecommendationEngine:
             else:
                 score += 0.2 * self.WEIGHTS['similarity_graph']
 
-            # 6. Diversity bonus computed in next pass
+            # Skip movies that scored negative (strongly disliked genre)
+            if score < 0:
+                continue
 
             movie['_score'] = round(score, 2)
             movie['_match_pct'] = min(98, max(55, int(score)))
             scored.append(movie)
 
-        # Sort by score descending
         scored.sort(key=lambda m: m['_score'], reverse=True)
         return scored
 

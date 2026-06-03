@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <script src="auth.js"></script>
     <meta charset="UTF-8">
@@ -24,7 +25,7 @@
         }
 
         body {
-            background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://img.yts.bz/assets/images/movies/the_social_network_2010/background.jpg');
+            background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://img.yts.bz/assets/images/movies/the_social_network_2010/background.jpg');
             background-size: cover;
             background-position: center;
             height: 100vh;
@@ -40,7 +41,7 @@
             width: 100%;
             max-width: 450px;
             border-radius: 4px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
         }
 
         h1 {
@@ -111,6 +112,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="login-card">
         <h1>Sign In</h1>
@@ -145,7 +147,14 @@
                 const data = await response.json();
                 if (data.success) {
                     localStorage.setItem('user', JSON.stringify(data.user));
-                    window.location.href = 'index.html';
+                    // Check if user has completed taste profile
+                    const profileRes = await fetch(`/api/taste-profile?session_id=${data.user.username}`);
+                    const profile = await profileRes.json();
+                    if (profile.onboarding_complete) {
+                        window.location.href = 'index.html';
+                    } else {
+                        window.location.href = 'onboarding.html';
+                    }
                 } else {
                     errorDiv.textContent = data.error || 'Login failed';
                     errorDiv.style.display = 'block';
@@ -157,4 +166,5 @@
         });
     </script>
 </body>
+
 </html>

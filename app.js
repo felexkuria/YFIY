@@ -252,6 +252,12 @@ async function renderMovieDetailPage(id) {
                       <button class="btn-list ml-2" id="watchlist-btn" data-movie-id="${movie.id}">
                         <span class="text-2xl">+</span>
                       </button>
+                      <button class="btn-list ml-2" id="thumbs-up-btn" data-movie-id="${movie.id}" title="I liked this">
+                        <span class="text-2xl">👍</span>
+                      </button>
+                      <button class="btn-list ml-2" id="thumbs-down-btn" data-movie-id="${movie.id}" title="Not for me">
+                        <span class="text-2xl">👎</span>
+                      </button>
                   </div>
               </div>
           </section>
@@ -404,6 +410,75 @@ async function renderMovieDetailPage(id) {
             };
         }
 
+        // Rating buttons (thumbs up/down)
+        const thumbsUpBtn = document.getElementById('thumbs-up-btn');
+        const thumbsDownBtn = document.getElementById('thumbs-down-btn');
+
+        // Check existing rating
+        try {
+            const ratingRes = await fetch(`${BACKEND_URL}/api/rate/${movie.id}?session_id=${currentSession}`);
+            const existingRating = await ratingRes.json();
+            if (existingRating.rating_type === 'thumbs') {
+                if (existingRating.rating_value > 0) {
+                    thumbsUpBtn.classList.add('active');
+                    thumbsUpBtn.style.background = 'rgba(70, 211, 105, 0.3)';
+                    thumbsUpBtn.style.borderColor = '#46d369';
+                } else {
+                    thumbsDownBtn.classList.add('active');
+                    thumbsDownBtn.style.background = 'rgba(229, 9, 20, 0.3)';
+                    thumbsDownBtn.style.borderColor = '#e50914';
+                }
+            }
+        } catch (e) { }
+
+        if (thumbsUpBtn) {
+            thumbsUpBtn.onclick = async () => {
+                const isActive = thumbsUpBtn.classList.contains('active');
+                const value = isActive ? 0 : 1;
+                await fetch(`${BACKEND_URL}/api/rate/${movie.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSession, rating_type: 'thumbs', value: value || 1 })
+                });
+                // Update UI
+                thumbsUpBtn.classList.toggle('active');
+                thumbsDownBtn.classList.remove('active');
+                thumbsDownBtn.style.background = '';
+                thumbsDownBtn.style.borderColor = '';
+                if (!isActive) {
+                    thumbsUpBtn.style.background = 'rgba(70, 211, 105, 0.3)';
+                    thumbsUpBtn.style.borderColor = '#46d369';
+                } else {
+                    thumbsUpBtn.style.background = '';
+                    thumbsUpBtn.style.borderColor = '';
+                }
+            };
+        }
+
+        if (thumbsDownBtn) {
+            thumbsDownBtn.onclick = async () => {
+                const isActive = thumbsDownBtn.classList.contains('active');
+                const value = isActive ? 0 : -1;
+                await fetch(`${BACKEND_URL}/api/rate/${movie.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: currentSession, rating_type: 'thumbs', value: value || -1 })
+                });
+                // Update UI
+                thumbsDownBtn.classList.toggle('active');
+                thumbsUpBtn.classList.remove('active');
+                thumbsUpBtn.style.background = '';
+                thumbsUpBtn.style.borderColor = '';
+                if (!isActive) {
+                    thumbsDownBtn.style.background = 'rgba(229, 9, 20, 0.3)';
+                    thumbsDownBtn.style.borderColor = '#e50914';
+                } else {
+                    thumbsDownBtn.style.background = '';
+                    thumbsDownBtn.style.borderColor = '';
+                }
+            };
+        }
+
         // Trailer logic
         const trailerBtn = document.getElementById('trailer-btn-trigger');
         if (trailerBtn) {
@@ -484,25 +559,40 @@ function showStreamPlayer(movie, torrent, startTime = 0) {
 
         // --- Helper to attach subtitle tracks (Native for Fullscreen Support) ---
         function attachSubtitleTracks(subtitles) {
-            const sub = subtitles[0];
-            if (!sub) return;
+            if (!subtitles || subtitles.length === 0) return;
 
-            // Use VTT format for native HTML5 track support
-            const subUrl = `${BACKEND_URL}/api/subtitle/${torrentId}/${sub.path}.vtt`;
+            // Prioritize English subtitles
+            const englishSub = subtitles.find(s =>
+                (s.language || '').toLowerCase() === 'english' ||
+                s.name.toLowerCase().includes('eng') ||
+                s.name.toLowerCase().includes('english')
+            );
+            const primarySub = englishSub || subtitles[0];
 
             // Remove existing tracks to prevent duplicates
             Array.from(videoPlayer.getElementsByTagName('track')).forEach(t => t.remove());
 
+            // Add primary (English) track
+            const subUrl = `${BACKEND_URL}/api/subtitle/${torrentId}/${encodeURIComponent(primarySub.path)}.vtt`;
             const track = document.createElement('track');
             track.kind = 'subtitles';
-            track.label = sub.language || 'English';
+            track.label = primarySub.language || 'English';
             track.srclang = 'en';
             track.src = subUrl;
             track.default = true;
-
             videoPlayer.appendChild(track);
 
-            // Force the text track to show (required for Safari/WebOS sometimes)
+            // Add other language tracks (if multiple subs available)
+            subtitles.filter(s => s !== primarySub).slice(0, 5).forEach(sub => {
+                const otherTrack = document.createElement('track');
+                otherTrack.kind = 'subtitles';
+                otherTrack.label = sub.language || sub.name;
+                otherTrack.srclang = (sub.language || 'en').slice(0, 2).toLowerCase();
+                otherTrack.src = `${BACKEND_URL}/api/subtitle/${torrentId}/${encodeURIComponent(sub.path)}.vtt`;
+                videoPlayer.appendChild(otherTrack);
+            });
+
+            // Force the primary text track to show
             setTimeout(() => {
                 if (videoPlayer.textTracks && videoPlayer.textTracks.length > 0) {
                     videoPlayer.textTracks[0].mode = 'showing';

@@ -133,6 +133,7 @@ def get_resolution(filename):
     return None
 
 def fetch_subtitlecat_url(title, year=None):
+    """Legacy SubtitleCat fetcher - kept as fallback."""
     search_query = quote_plus(f"{title} {year}" if year else title)
     search_url = f"https://www.subtitlecat.com/index.php?search={search_query}"
     
@@ -161,7 +162,50 @@ def fetch_subtitlecat_url(title, year=None):
             
         return None
     except Exception as e:
-        print(f"Subtitle fetch error: {e}")
+        print(f"SubtitleCat fetch error: {e}")
+        return None
+
+
+def fetch_opensubtitles(imdb_code, language='eng'):
+    """
+    Fetch subtitle download URL from OpenSubtitles.org REST API.
+    Works for virtually any movie with an IMDB code.
+    Returns the download URL (gzipped .srt) or None.
+    """
+    if not imdb_code:
+        return None
+    
+    # Strip 'tt' prefix if present and pad with zeros
+    imdb_id = imdb_code.replace('tt', '').lstrip('0')
+    
+    try:
+        import requests as req_lib
+        url = f'https://rest.opensubtitles.org/search/imdbid-{imdb_id}/sublanguageid-{language}'
+        headers = {
+            'User-Agent': 'NinjaMovieVault v1.0',
+            'X-User-Agent': 'NinjaMovieVault v1.0'
+        }
+        response = req_lib.get(url, headers=headers, timeout=12)
+        
+        if response.status_code != 200:
+            print(f"[!] OpenSubtitles returned status {response.status_code}")
+            return None
+        
+        data = response.json()
+        
+        if not data or not isinstance(data, list) or len(data) == 0:
+            return None
+        
+        # Sort by download count (most popular = best quality)
+        data.sort(key=lambda x: int(x.get('SubDownloadsCnt', 0)), reverse=True)
+        
+        # Return the top result's download link
+        best = data[0]
+        download_url = best.get('SubDownloadLink')
+        print(f"[✓] OpenSubtitles found: {best.get('SubFileName')} ({best.get('SubDownloadsCnt', 0)} downloads)")
+        return download_url
+    except Exception as e:
+        print(f"[!] OpenSubtitles fetch error: {e}")
         return None
 
 @app.route('/api/proxy-image')
@@ -918,12 +962,69 @@ def save_watch_progress(movie_id):
     
     return jsonify({'success': True})
 
+def _detect_subtitle_language(filename):
+    """Detect language from subtitle filename patterns like 'eng.srt', 'English.srt', 'spa.srt'."""
+    name = os.path.splitext(filename)[0].lower()
+    # Remove 'forced' prefix
+    name = name.replace('forced.', '').replace('forced_', '')
+    
+    lang_map = {
+        'eng': 'English', 'english': 'English', 'en': 'English',
+        'spa': 'Spanish', 'spanish': 'Spanish', 'es': 'Spanish',
+        'fre': 'French', 'french': 'French', 'fr': 'French',
+        'ger': 'German', 'german': 'German', 'de': 'German', 'deu': 'German',
+        'ita': 'Italian', 'italian': 'Italian', 'it': 'Italian',
+        'por': 'Portuguese', 'portuguese': 'Portuguese', 'pt': 'Portuguese',
+        'dut': 'Dutch', 'dutch': 'Dutch', 'nl': 'Dutch', 'nld': 'Dutch',
+        'rus': 'Russian', 'russian': 'Russian', 'ru': 'Russian',
+        'jpn': 'Japanese', 'japanese': 'Japanese', 'ja': 'Japanese',
+        'kor': 'Korean', 'korean': 'Korean', 'ko': 'Korean',
+        'chi': 'Chinese', 'chinese': 'Chinese', 'zh': 'Chinese',
+        'ara': 'Arabic', 'arabic': 'Arabic', 'ar': 'Arabic',
+        'tur': 'Turkish', 'turkish': 'Turkish', 'tr': 'Turkish',
+        'pol': 'Polish', 'polish': 'Polish', 'pl': 'Polish',
+        'cze': 'Czech', 'czech': 'Czech', 'cs': 'Czech',
+        'dan': 'Danish', 'danish': 'Danish', 'da': 'Danish',
+        'fin': 'Finnish', 'finnish': 'Finnish', 'fi': 'Finnish',
+        'gre': 'Greek', 'greek': 'Greek', 'el': 'Greek',
+        'heb': 'Hebrew', 'hebrew': 'Hebrew', 'he': 'Hebrew',
+        'hin': 'Hindi', 'hindi': 'Hindi', 'hi': 'Hindi',
+        'hun': 'Hungarian', 'hungarian': 'Hungarian', 'hu': 'Hungarian',
+        'ind': 'Indonesian', 'indonesian': 'Indonesian', 'id': 'Indonesian',
+        'nor': 'Norwegian', 'norwegian': 'Norwegian', 'no': 'Norwegian',
+        'rum': 'Romanian', 'romanian': 'Romanian', 'ro': 'Romanian',
+        'swe': 'Swedish', 'swedish': 'Swedish', 'sv': 'Swedish',
+        'tha': 'Thai', 'thai': 'Thai', 'th': 'Thai',
+        'ukr': 'Ukrainian', 'ukrainian': 'Ukrainian', 'uk': 'Ukrainian',
+        'vie': 'Vietnamese', 'vietnamese': 'Vietnamese', 'vi': 'Vietnamese',
+        'hrv': 'Croatian', 'croatian': 'Croatian', 'hr': 'Croatian',
+        'fil': 'Filipino', 'filipino': 'Filipino', 'tl': 'Filipino',
+        'may': 'Malay', 'malay': 'Malay', 'ms': 'Malay',
+    }
+    
+    # Check exact match first (e.g., "eng.srt" -> name="eng")
+    if name in lang_map:
+        return lang_map[name]
+    
+    # Check if name contains a language code (e.g., "movie.eng.srt")
+    parts = name.split('.')
+    for part in reversed(parts):
+        if part in lang_map:
+            return lang_map[part]
+    
+    # Check if the full name contains a language word
+    for key, lang in lang_map.items():
+        if key in name:
+            return lang
+    
+    return 'English'  # Default fallback
+
 @app.route('/api/subtitles/<torrent_id>')
 def get_subtitles(torrent_id):
     h = active_torrents.get(torrent_id)
     subs = []
     
-    # 1. Check local files
+    # 1. Check local subtitle files from active torrent metadata
     if h and h.status().has_metadata:
         try:
             ti = h.torrent_file()
@@ -933,25 +1034,88 @@ def get_subtitles(torrent_id):
                 if f_path.lower().endswith(('.srt', '.vtt')):
                     full_path = os.path.join('./downloads', f_path)
                     if os.path.exists(full_path):
-                        subs.append({'name': os.path.basename(f_path), 'path': f_path})
+                        subs.append({'name': os.path.basename(f_path), 'path': f_path, 'language': 'English'})
         except: pass
-        
-    # 2. Check Database / SubtitleCat
-    try:
-        movie_info = db.get_movie_by_hash(torrent_id)
-        if movie_info:
-            sub_url = movie_info.get('subtitle_url')
-            if not sub_url:
-                print(f"Fetching subtitle from SubtitleCat for: {movie_info['title']} {movie_info['year']}")
-                sub_url = fetch_subtitlecat_url(movie_info['title'], movie_info['year'])
-                if sub_url:
-                    db.update_subtitle_url(torrent_id, sub_url)
+
+    # 2. Check local filesystem for subtitle files alongside the video
+    if not subs:
+        existing_video = find_existing_file(torrent_id)
+        if existing_video:
+            video_dir = os.path.dirname(existing_video)
+            video_base = os.path.splitext(os.path.basename(existing_video))[0]
             
-            if sub_url:
-                # Add it to the subs list. Path is just a marker we understand in serve_subtitle.
-                subs.append({'name': 'English (SubtitleCat)', 'path': 'REMOTE_SUB_MARKER'})
-    except Exception as e:
-        print(f"Database subtitle error: {e}")
+            # Check same directory as video
+            if os.path.isdir(video_dir):
+                for f in os.listdir(video_dir):
+                    if f.lower().endswith(('.srt', '.vtt')):
+                        rel_path = os.path.relpath(os.path.join(video_dir, f), './downloads')
+                        lang = _detect_subtitle_language(f)
+                        subs.append({'name': f, 'path': rel_path, 'language': lang})
+            
+            # Check Subs subdirectory
+            subs_dir = os.path.join(video_dir, 'Subs')
+            if os.path.isdir(subs_dir):
+                for f in os.listdir(subs_dir):
+                    if f.lower().endswith(('.srt', '.vtt')):
+                        rel_path = os.path.relpath(os.path.join(subs_dir, f), './downloads')
+                        lang = _detect_subtitle_language(f)
+                        subs.append({'name': f, 'path': rel_path, 'language': lang})
+
+    # 3. If no local subs found, check other quality versions of the same movie
+    if not subs:
+        try:
+            movie_info = db.get_movie_by_hash(torrent_id)
+            if movie_info:
+                # Search all download folders for this movie title
+                title_norm = re.sub(r'[^a-z0-9]+', '', movie_info['title'].lower())
+                for root, dirs, files in os.walk('./downloads'):
+                    dir_name = os.path.basename(root).lower()
+                    dir_norm = re.sub(r'[^a-z0-9]+', '', dir_name)
+                    if title_norm in dir_norm or dir_norm in title_norm:
+                        for f in files:
+                            if f.lower().endswith(('.srt', '.vtt')):
+                                rel_path = os.path.relpath(os.path.join(root, f), './downloads')
+                                subs.append({'name': f + ' (alt quality)', 'path': rel_path, 'language': 'English'})
+                        # Check Subs subfolder
+                        subs_subdir = os.path.join(root, 'Subs')
+                        if os.path.isdir(subs_subdir):
+                            for f in os.listdir(subs_subdir):
+                                if f.lower().endswith(('.srt', '.vtt')):
+                                    rel_path = os.path.relpath(os.path.join(subs_subdir, f), './downloads')
+                                    subs.append({'name': f + ' (alt quality)', 'path': rel_path, 'language': 'English'})
+                    if subs:
+                        break
+        except Exception as e:
+            print(f"[!] Cross-quality subtitle search error: {e}")
+
+    # 4. If still no local subs, try fetching from OpenSubtitles (primary) then SubtitleCat (fallback)
+    if not subs:
+        try:
+            movie_info = db.get_movie_by_hash(torrent_id)
+            if movie_info:
+                sub_url = movie_info.get('subtitle_url')
+                if not sub_url:
+                    # Try OpenSubtitles first (works for ~95% of movies via IMDB code)
+                    imdb_code = movie_info.get('imdb_code')
+                    if imdb_code:
+                        print(f"[*] Fetching subtitle from OpenSubtitles for: {movie_info['title']} (IMDB: {imdb_code})")
+                        sub_url = fetch_opensubtitles(imdb_code)
+                    
+                    # Fallback to SubtitleCat if OpenSubtitles fails
+                    if not sub_url:
+                        print(f"[*] Trying SubtitleCat for: {movie_info['title']}")
+                        sub_url = fetch_subtitlecat_url(movie_info['title'], movie_info.get('year'))
+                    
+                    if sub_url:
+                        db.update_subtitle_url(torrent_id, sub_url)
+                        print(f"[✓] Subtitle URL saved: {sub_url[:80]}...")
+                    else:
+                        print(f"[!] No subtitle found online for: {movie_info['title']}")
+                
+                if sub_url:
+                    subs.append({'name': 'English (Online)', 'path': 'REMOTE_SUB_MARKER', 'language': 'English'})
+        except Exception as e:
+            print(f"[!] Subtitle lookup error: {e}")
         
     return jsonify({'subtitles': subs})
 
@@ -996,51 +1160,92 @@ def serve_subtitle(torrent_id, path):
     elif request.args.get('format') == 'srt':
         serve_raw = True
     
-    if path.endswith('REMOTE_SUB_MARKER'):
+    # Handle remote subtitle (OpenSubtitles/SubtitleCat proxy)
+    if 'REMOTE_SUB_MARKER' in path:
         movie_info = db.get_movie_by_hash(torrent_id)
         if movie_info and movie_info.get('subtitle_url'):
             url = movie_info['subtitle_url']
             
-            from urllib.parse import urlparse, quote
-            parsed_url = urlparse(url)
-            encoded_path = quote(parsed_url.path)
-            safe_url = f"{parsed_url.scheme}://{parsed_url.netloc}{encoded_path}"
-            
             try:
-                req = urllib.request.Request(safe_url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    content = response.read().decode('utf-8', errors='ignore')
+                import gzip
+                import requests as req_lib
+                
+                # OpenSubtitles returns gzipped content
+                is_gzipped = '.gz' in url or 'opensubtitles.org' in url
+                
+                resp = req_lib.get(url, headers={
+                    'User-Agent': 'NinjaMovieVault v1.0',
+                    'X-User-Agent': 'NinjaMovieVault v1.0'
+                }, timeout=15)
+                
+                raw_content = resp.content
+                
+                # Decompress if gzipped
+                if is_gzipped:
+                    try:
+                        content = gzip.decompress(raw_content).decode('utf-8', errors='ignore')
+                    except:
+                        content = raw_content.decode('utf-8', errors='ignore')
+                else:
+                    content = raw_content.decode('utf-8', errors='ignore')
+                
                 if serve_raw:
                     return Response(content, content_type='text/plain; charset=utf-8',
                                     headers={'Access-Control-Allow-Origin': '*'})
+                
+                # Convert SRT to VTT
                 vtt_content = "WEBVTT\n\n" + re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', content)
-                return Response(vtt_content, content_type='text/vtt; charset=utf-8', headers={'Access-Control-Allow-Origin': '*'})
+                return Response(vtt_content, content_type='text/vtt; charset=utf-8', 
+                                headers={'Access-Control-Allow-Origin': '*'})
             except Exception as e:
-                print(f"Error proxying subtitle: {e}")
-                return "Sub error", 500
+                print(f"[!] Error proxying remote subtitle: {e}")
+                return jsonify({'error': 'Failed to fetch remote subtitle'}), 500
+        return jsonify({'error': 'No remote subtitle URL found'}), 404
 
+    # Handle local subtitle file
     file_path = os.path.join('./downloads', path)
     if not os.path.exists(file_path):
-        # Try searching for subtitle file in downloads folder
-        search_path = os.path.join('./downloads', '**', os.path.basename(path))
-        for found_file in glob.iglob(search_path, recursive=True):
-            if found_file.lower().endswith(('.srt', '.vtt')):
-                file_path = found_file
-                break
-        else:
-            return "Not found", 404
+        # Try searching in the movie's directory
+        existing_video = find_existing_file(torrent_id)
+        if existing_video:
+            video_dir = os.path.dirname(existing_video)
+            candidate = os.path.join(video_dir, os.path.basename(path))
+            if os.path.exists(candidate):
+                file_path = candidate
+            else:
+                # Search recursively
+                search_path = os.path.join(video_dir, '**', os.path.basename(path))
+                for found_file in glob.iglob(search_path, recursive=True):
+                    if found_file.lower().endswith(('.srt', '.vtt')):
+                        file_path = found_file
+                        break
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Subtitle file not found'}), 404
     
-    if file_path.lower().endswith('.srt'):
+    # Convert SRT to VTT for browser compatibility
+    if file_path.lower().endswith('.srt') and not serve_raw:
         try:
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
-            if serve_raw:
-                return Response(content, content_type='text/plain; charset=utf-8',
-                                headers={'Access-Control-Allow-Origin': '*'})
+            # SRT -> VTT conversion: replace commas with dots in timestamps
             vtt_content = "WEBVTT\n\n" + re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', content)
-            return Response(vtt_content, content_type='text/vtt; charset=utf-8', headers={'Access-Control-Allow-Origin': '*'})
-        except: pass
-    return send_file(file_path, mimetype='text/vtt' if path.endswith('.vtt') else 'text/plain')
+            return Response(vtt_content, content_type='text/vtt; charset=utf-8',
+                            headers={'Access-Control-Allow-Origin': '*'})
+        except Exception as e:
+            print(f"[!] SRT conversion error: {e}")
+            return jsonify({'error': 'Failed to convert subtitle'}), 500
+    
+    if serve_raw:
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            return Response(content, content_type='text/plain; charset=utf-8',
+                            headers={'Access-Control-Allow-Origin': '*'})
+        except:
+            pass
+    
+    return send_file(file_path, mimetype='text/vtt' if file_path.endswith('.vtt') else 'text/plain')
 
 @app.route('/api/recommendations/save/<int:movie_id>', methods=['POST'])
 def save_recommendations(movie_id):
@@ -1091,6 +1296,76 @@ def refresh_recommendations():
     except Exception as e:
         print(f'[!] Recommendation refresh error: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# --- User Ratings (Thumbs Up/Down & Stars) ---
+
+@app.route('/api/rate/<int:movie_id>', methods=['POST'])
+def rate_movie(movie_id):
+    """
+    Rate a movie. Body: { rating_type: 'thumbs'|'stars', value: -1|1 or 1-5, session_id }
+    This directly trains the recommendation algorithm.
+    """
+    data = request.json or {}
+    session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    rating_type = data.get('rating_type', 'thumbs')  # 'thumbs' or 'stars'
+    value = data.get('value', 1)
+    
+    # Get movie genres to store with rating (used for preference learning)
+    genres = None
+    with db.get_connection() as conn:
+        row = conn.execute('SELECT genres FROM movies WHERE id = ?', (movie_id,)).fetchone()
+        if row:
+            genres = json.loads(row['genres'] or '[]')
+    
+    db.rate_movie(movie_id, session_id, rating_type, value, genres)
+    
+    # Refresh recommendations in background (rating = strong signal)
+    trigger_recommendation_refresh(session_id)
+    
+    return jsonify({'success': True, 'movie_id': movie_id, 'rating_type': rating_type, 'value': value})
+
+@app.route('/api/rate/<int:movie_id>', methods=['GET'])
+def get_rating(movie_id):
+    """Get user's rating for a specific movie."""
+    session_id = request.args.get('session_id', 'default')
+    rating = db.get_user_rating(movie_id, session_id)
+    return jsonify(rating or {})
+
+
+# --- Taste Profile (Onboarding Quiz) ---
+
+@app.route('/api/taste-profile', methods=['GET'])
+def get_taste_profile():
+    """Get user's taste profile (check if onboarding is complete)."""
+    session_id = request.args.get('session_id', 'default')
+    profile = db.get_taste_profile(session_id)
+    return jsonify(profile or {'onboarding_complete': 0})
+
+@app.route('/api/taste-profile', methods=['POST'])
+def save_taste_profile():
+    """
+    Save user's taste preferences from onboarding quiz.
+    Body: { 
+        session_id, 
+        genres: ['Action', 'Drama', ...],
+        moods: ['intense', 'lighthearted', ...],
+        eras: ['modern', 'classic', ...]
+    }
+    """
+    data = request.json or {}
+    session_id = data.get('session_id') or request.args.get('session_id', 'default')
+    
+    genres = data.get('genres', [])
+    moods = data.get('moods', [])
+    eras = data.get('eras', [])
+    
+    db.save_taste_profile(session_id, genres, moods, eras)
+    
+    # Immediately regenerate recommendations with new taste data
+    trigger_recommendation_refresh(session_id)
+    
+    return jsonify({'success': True, 'message': 'Taste profile saved. Recommendations updating...'})
 
 
 @app.route('/api/downloads', methods=['GET'])

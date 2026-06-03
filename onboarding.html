@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <script src="auth.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>What Do You Like? - Ninja Movie Vault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="tv-compat.css">
+    <style>
+        :root {
+            --primary: #E50914;
+            --bg: #141414;
+            --card: #1a1a1a;
+            --text: #fff;
+            --text-dim: #8c8c8c;
+            --border: rgba(255, 255, 255, 0.1);
+            --success: #46d369;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 24px 120px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #fff 0%, #ccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 40px;
+        }
+
+        .step-dot {
+            width: 40px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+
+        .step-dot.active {
+            background: var(--primary);
+            width: 60px;
+        }
+
+        .step-dot.done {
+            background: var(--success);
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .section-subtitle {
+            color: var(--text-dim);
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+        }
+
+        .chip-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chip {
+            padding: 12px 24px;
+            background: var(--card);
+            border: 2px solid var(--border);
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .chip:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: scale(1.03);
+        }
+
+        .chip.selected {
+            background: rgba(229, 9, 20, 0.15);
+            border-color: var(--primary);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(229, 9, 20, 0.2);
+        }
+
+        .chip .emoji {
+            margin-right: 8px;
+            font-size: 1.2rem;
+        }
+
+        .nav-buttons {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 12px;
+            padding: 20px 24px;
+            background: linear-gradient(to top, var(--bg) 80%, transparent);
+            max-width: 800px;
+            margin: 0 auto;
+            z-index: 100;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 16px 32px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #f40612;
+            transform: scale(1.02);
+        }
+
+        .btn-primary:disabled {
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .skip-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: underline;
+            transition: color 0.2s;
+        }
+
+        .skip-link:hover {
+            color: #fff;
+        }
+
+        .completion-screen {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .completion-screen .checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--success);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 2.5rem;
+            animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(0);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .completion-screen h2 {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .completion-screen p {
+            color: var(--text-dim);
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Set Up Your Profile</h1>
+            <p>Pick what you love. We'll personalize your vault.</p>
+        </div>
+
+        <div class="step-indicator">
+            <div class="step-dot active" id="dot-1"></div>
+            <div class="step-dot" id="dot-2"></div>
+            <div class="step-dot" id="dot-3"></div>
+        </div>
+
+        <!-- Step 1: Genres -->
+        <div class="step active" id="step-1">
+            <h3 class="section-title">Pick your genres</h3>
+            <p class="section-subtitle">Select at least 3 genres you enjoy watching</p>
+            <div class="chip-grid" id="genre-grid"></div>
+        </div>
+
+        <!-- Step 2: Moods -->
+        <div class="step" id="step-2">
+            <h3 class="section-title">What mood are you usually in?</h3>
+            <p class="section-subtitle">What kind of experience do you crave?</p>
+            <div class="chip-grid" id="mood-grid"></div>
+        </div>
+
+        <!-- Step 3: Era -->
+        <div class="step" id="step-3">
+            <h3 class="section-title">What era of film?</h3>
+            <p class="section-subtitle">Which decades do you gravitate towards?</p>
+            <div class="chip-grid" id="era-grid"></div>
+        </div>
+
+        <!-- Completion -->
+        <div class="step" id="step-done">
+            <div class="completion-screen">
+                <div class="checkmark">✓</div>
+                <h2>You're all set!</h2>
+                <p>Your personalized vault is ready. We'll keep learning as you watch.</p>
+            </div>
+        </div>
+
+        <span class="skip-link" id="skip-btn" onclick="skipOnboarding()">Skip for now</span>
+    </div>
+
+    <div class="nav-buttons">
+        <button class="btn btn-secondary" id="back-btn" style="display:none" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" id="next-btn" onclick="nextStep()" disabled>Next</button>
+    </div>
+
+    <script>
+        const BACKEND_URL = `${window.location.protocol}//${window.location.host}`;
+        const currentSession = window.getCurrentSession();
+
+        const genres = [
+            { name: 'Action', emoji: '💥' },
+            { name: 'Comedy', emoji: '😂' },
+            { name: 'Drama', emoji: '🎭' },
+            { name: 'Horror', emoji: '👻' },
+            { name: 'Sci-Fi', emoji: '🚀' },
+            { name: 'Thriller', emoji: '🔪' },
+            { name: 'Romance', emoji: '💕' },
+            { name: 'Animation', emoji: '🎨' },
+            { name: 'Documentary', emoji: '📹' },
+            { name: 'Fantasy', emoji: '🧙' },
+            { name: 'Mystery', emoji: '🔍' },
+            { name: 'Adventure', emoji: '🗺️' },
+            { name: 'Crime', emoji: '🕵️' },
+            { name: 'War', emoji: '⚔️' },
+            { name: 'History', emoji: '📜' },
+            { name: 'Music', emoji: '🎵' },
+            { name: 'Western', emoji: '🤠' },
+            { name: 'Biography', emoji: '📖' },
+        ];
+
+        const moods = [
+            { name: 'intense', label: 'Edge-of-seat intense', emoji: '⚡' },
+            { name: 'lighthearted', label: 'Lighthearted & fun', emoji: '☀️' },
+            { name: 'dark', label: 'Dark & gritty', emoji: '🌑' },
+            { name: 'emotional', label: 'Emotional & deep', emoji: '💫' },
+            { name: 'mind_bending', label: 'Mind-bending', emoji: '🧠' },
+            { name: 'feel_good', label: 'Feel-good vibes', emoji: '🌈' },
+            { name: 'suspenseful', label: 'Suspenseful', emoji: '😰' },
+            { name: 'inspiring', label: 'Inspiring & uplifting', emoji: '🙌' },
+        ];
+
+        const eras = [
+            { name: 'new_releases', label: '2024-2026 (New Releases)', emoji: '🔥' },
+            { name: 'recent', label: '2018-2023 (Recent)', emoji: '✨' },
+            { name: 'modern', label: '2008-2017 (Modern Classics)', emoji: '🎬' },
+            { name: 'retro', label: '1990-2007 (Retro Gold)', emoji: '📀' },
+            { name: 'classic', label: 'Before 1990 (Timeless)', emoji: '🎞️' },
+        ];
+
+        let currentStep = 1;
+        const selections = { genres: [], moods: [], eras: [] };
+
+        function renderChips(container, items, selectionKey, labelKey) {
+            const grid = document.getElementById(container);
+            grid.innerHTML = items.map(item => `
+                <div class="chip" data-value="${item.name}" onclick="toggleChip(this, '${selectionKey}')">
+                    <span class="emoji">${item.emoji}</span>${item[labelKey] || item.name}
+                </div>
+            `).join('');
+        }
+
+        function toggleChip(el, key) {
+            const value = el.dataset.value;
+            el.classList.toggle('selected');
+            if (el.classList.contains('selected')) {
+                selections[key].push(value);
+            } else {
+                selections[key] = selections[key].filter(v => v !== value);
+            }
+            updateNextBtn();
+        }
+
+        function updateNextBtn() {
+            const btn = document.getElementById('next-btn');
+            if (currentStep === 1) {
+                btn.disabled = selections.genres.length < 3;
+                btn.textContent = selections.genres.length < 3
+                    ? `Pick ${3 - selections.genres.length} more`
+                    : 'Next';
+            } else if (currentStep === 2) {
+                btn.disabled = selections.moods.length < 1;
+                btn.textContent = 'Next';
+            } else if (currentStep === 3) {
+                btn.disabled = selections.eras.length < 1;
+                btn.textContent = 'Finish';
+            }
+        }
+
+        function nextStep() {
+            if (currentStep === 3) {
+                saveProfile();
+                return;
+            }
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            document.getElementById(`dot-${currentStep}`).classList.remove('active');
+            document.getElementById(`dot-${currentStep}`).classList.add('done');
+            currentStep++;
+            document.getElementById(`step-${currentStep}`).classList.add('active');
+            document.getElementById(`dot-${currentStep}`).classList.add('active');
+            document.getElementById('back-btn').style.display = 'block';
+            updateNextBtn();
+        }
+
+        function prevStep() {
+            document.getElementById(`step-${currentStep}`).classList.remove('active');
+            document.getElementById(`dot-${currentStep}`).classList.remove('active');
+            currentStep--;
+            document.getElementById(`step-${currentStep}`).classList.add('active');
+            document.getElementById(`dot-${currentStep}`).classList.add('active');
+            document.getElementById(`dot-${currentStep}`).classList.remove('done');
+            if (currentStep === 1) document.getElementById('back-btn').style.display = 'none';
+            updateNextBtn();
+        }
+
+        async function saveProfile() {
+            const btn = document.getElementById('next-btn');
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+
+            try {
+                await fetch(`${BACKEND_URL}/api/taste-profile`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: currentSession,
+                        genres: selections.genres,
+                        moods: selections.moods,
+                        eras: selections.eras
+                    })
+                });
+
+                // Show completion
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                document.getElementById(`dot-${currentStep}`).classList.add('done');
+                document.getElementById('step-done').classList.add('active');
+                document.getElementById('skip-btn').style.display = 'none';
+                document.querySelector('.nav-buttons').innerHTML = `
+                    <button class="btn btn-primary" onclick="window.location.href='index.html'" style="flex:1">
+                        Start Watching
+                    </button>
+                `;
+            } catch (e) {
+                btn.textContent = 'Error - Try Again';
+                btn.disabled = false;
+            }
+        }
+
+        function skipOnboarding() {
+            window.location.href = 'index.html';
+        }
+
+        // Check if already completed
+        (async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/taste-profile?session_id=${currentSession}`);
+                const profile = await res.json();
+                if (profile.onboarding_complete) {
+                    window.location.href = 'index.html';
+                }
+            } catch (e) { }
+        })();
+
+        // Initialize
+        renderChips('genre-grid', genres, 'genres', 'name');
+        renderChips('mood-grid', moods, 'moods', 'label');
+        renderChips('era-grid', eras, 'eras', 'label');
+        updateNextBtn();
+    </script>
+</body>
+
+</html>

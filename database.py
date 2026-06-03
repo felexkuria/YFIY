@@ -130,6 +130,37 @@ class DatabaseManager:
             ''')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_cast_movie ON cast_members(movie_id)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_cast_name ON cast_members(LOWER(name))')
+
+            # Migration: user_ratings table (thumbs up/down + 1-5 stars)
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_ratings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    movie_id INTEGER NOT NULL,
+                    user_session TEXT NOT NULL,
+                    rating_type TEXT NOT NULL,
+                    rating_value INTEGER NOT NULL,
+                    genres TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(movie_id, user_session),
+                    FOREIGN KEY (movie_id) REFERENCES movies(id)
+                )
+            ''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_user_ratings_session ON user_ratings(user_session)')
+
+            # Migration: taste_profile table (onboarding genre/mood preferences)
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS taste_profile (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_session TEXT NOT NULL,
+                    genre_preferences TEXT,
+                    mood_preferences TEXT,
+                    era_preferences TEXT,
+                    onboarding_complete INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_session)
+                )
+            ''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_taste_profile_session ON taste_profile(user_session)')
     
     def get_cache(self, key):
         with self.get_connection() as conn:
@@ -226,7 +257,8 @@ class DatabaseManager:
     def get_movie_by_hash(self, torrent_hash):
         with self.get_connection() as conn:
             result = conn.execute('''
-                SELECT m.id, m.title, m.year, m.rating, m.cover_image AS medium_cover_image, t.subtitle_url 
+                SELECT m.id, m.title, m.year, m.rating, m.imdb_code,
+                       m.cover_image AS medium_cover_image, t.subtitle_url 
                 FROM torrents t 
                 JOIN movies m ON t.movie_id = m.id 
                 WHERE LOWER(t.hash) = ?
@@ -477,5 +509,67 @@ class DatabaseManager:
                 print(f"[✓] Poster saved to {poster_path}")
         except Exception as e:
             print(f"[!] Error downloading poster: {e}")
+
+    # --- User Ratings ---
+    def rate_movie(self, movie_id, session_id, rating_type, rating_value, genres=None):
+        """
+        Save user's rating for a movie.
+        rating_type: 'thumbs' (value: 1=up, -1=down) or 'stars' (value: 1-5)
+        """
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO user_ratings 
+                (movie_id, user_session, rating_type, rating_value, genres, created_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ''', (movie_id, session_id, rating_type, rating_value, 
+                  json.dumps(genres) if genres else None))
+
+    def get_user_rating(self, movie_id, session_id):
+        with self.get_connection() as conn:
+            result = conn.execute('''
+                SELECT rating_type, rating_value FROM user_ratings
+                WHERE movie_id = ? AND user_session = ?
+            ''', (movie_id, session_id)).fetchone()
+            return dict(result) if result else None
+
+    def get_all_user_ratings(self, session_id):
+        with self.get_connection() as conn:
+            results = conn.execute('''
+                SELECT ur.movie_id, ur.rating_type, ur.rating_value, ur.genres,
+                       m.title, m.year, m.rating as movie_rating
+                FROM user_ratings ur
+                JOIN movies m ON ur.movie_id = m.id
+                WHERE ur.user_session = ?
+                ORDER BY ur.created_at DESC
+            ''', (session_id,)).fetchall()
+            return [dict(row) for row in results]
+
+    # --- Taste Profile ---
+    def save_taste_profile(self, session_id, genre_preferences=None, 
+                           mood_preferences=None, era_preferences=None):
+        """Save or update the user's taste profile from onboarding quiz."""
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT OR REPLACE INTO taste_profile 
+                (user_session, genre_preferences, mood_preferences, era_preferences, 
+                 onboarding_complete, updated_at)
+                VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+            ''', (session_id, 
+                  json.dumps(genre_preferences) if genre_preferences else None,
+                  json.dumps(mood_preferences) if mood_preferences else None,
+                  json.dumps(era_preferences) if era_preferences else None))
+
+    def get_taste_profile(self, session_id):
+        with self.get_connection() as conn:
+            result = conn.execute('''
+                SELECT * FROM taste_profile WHERE user_session = ?
+            ''', (session_id,)).fetchone()
+            if result:
+                d = dict(result)
+                d['genre_preferences'] = json.loads(d['genre_preferences']) if d.get('genre_preferences') else []
+                d['mood_preferences'] = json.loads(d['mood_preferences']) if d.get('mood_preferences') else []
+                d['era_preferences'] = json.loads(d['era_preferences']) if d.get('era_preferences') else []
+                return d
+            return None
 
 db = DatabaseManager()
